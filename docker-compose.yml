@@ -1,0 +1,63 @@
+# docker-compose.yml
+
+
+services:
+
+
+  backend:
+    build:
+     context: ./backend
+     dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    networks:
+      - backend
+    ports:
+      - "8000:8000"
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - "**/__pycache__"
+            - "**/*.pyc"
+        - action: rebuild
+          path: ./backend/requirements.txt
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE_URL: https://backend:8000/api/
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend:/app:delegated
+      - /app/node_modules
+      - /app/.vite
+    networks:
+      - backend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - "node_modules"
+        - action: rebuild
+          path: ./frontend/package.json
+
+
+
+networks:
+  backend:
+
+
+
+
+
