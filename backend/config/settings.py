@@ -62,9 +62,9 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 # In settings.py
-DEBUG_TOOLBAR_CONFIG = {
-    'SHOW_TOOLBAR_CALLBACK': lambda request: False,
-}
+# DEBUG_TOOLBAR_CONFIG = {
+#     'SHOW_TOOLBAR_CALLBACK': lambda request: False,
+# }
 
 
 CORS_ALLOWED_ORIGINS = [
@@ -75,7 +75,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:5173'
 ]
 CORS_ALLOW_CREDENTIALS = True
-CSRF_COOKIE_SECURE = True
+#
+
 
 
 # Only for production
