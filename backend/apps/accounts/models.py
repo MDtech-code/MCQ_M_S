@@ -9,6 +9,9 @@ from apps.accounts.validators import validate_phone_number
 from django.db.models.functions import Lower
 from apps.common.models import TimeStampedModel
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from datetime import timedelta
+import uuid
 
 
 
@@ -159,6 +162,55 @@ class User(AbstractUser):
         return None
 
 
+
+class EmailVerificationToken(TimeStampedModel):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='email_tokens'
+    )
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = _('email verification token')
+        verbose_name_plural = _('email verification tokens')
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=24)  # 24-hour expiry
+        super().save(*args, **kwargs)
+
+    def is_valid(self):
+        return timezone.now() <= self.expires_at
+
+    def __str__(self):
+        return f"Token for {self.user.email}"
+    
+# apps/accounts/models.py
+class PasswordResetToken(TimeStampedModel):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='password_reset_tokens'
+    )
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = _('password reset token')
+        verbose_name_plural = _('password reset tokens')
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=1)  # 1-hour expiry
+        super().save(*args, **kwargs)
+
+    def is_valid(self):
+        return timezone.now() <= self.expires_at
+
+    def __str__(self):
+        return f"Reset token for {self.user.email}"
 class BaseProfile(TimeStampedModel):
     """
     Abstract base profile containing common personal information.
@@ -181,8 +233,8 @@ class BaseProfile(TimeStampedModel):
         max_length=20,
         validators=[validate_phone_number],
         blank=True,
-        #null=True,
-        default='',
+        null=True,
+        # default='',
         unique=True,
         help_text=_('E.164 formatted international number')
     )

@@ -1,3 +1,4 @@
+# apps/accounts/apps.py
 from django.apps import AppConfig
 
 class AccountsConfig(AppConfig):
@@ -5,5 +6,5 @@ class AccountsConfig(AppConfig):
     name = 'apps.accounts'
 
     def ready(self):
-        # Import signals
-        from . import signals
+        # Import signals to register them
+        import apps.accounts.signals

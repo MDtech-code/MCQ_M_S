@@ -2,11 +2,13 @@
 
 
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+
 import Landing from './pages/Landing';
 import TeacherLanding from './pages/TeacherLanding';
 import StudentLanding from './pages/StudentLanding';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import { ApiProvider } from './context/ApiContext';
 
 const router = createBrowserRouter([
   { path: '/', element: <Landing /> },
@@ -22,7 +24,12 @@ const router = createBrowserRouter([
 });
 
 function App() {
-  return <RouterProvider router={router}  />;
+  return (
+    <ApiProvider>
+      <RouterProvider router={router}  />
+    </ApiProvider>
+  ) 
+    
 }
 
 export default App;
