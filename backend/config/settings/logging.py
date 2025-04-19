@@ -14,6 +14,18 @@ LOGGING = {
         },
     },
     'handlers': {
+        'content_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'content.log',
+            'formatter': 'verbose',
+        },
+        'examination_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'examination.log',
+            'formatter': 'verbose',
+        },
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',  # Use verbose format for console
@@ -36,6 +48,16 @@ LOGGING = {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
             'propagate': False,  # Prevent logs from going to root logger
+        },
+        'apps.content': {
+            'handlers': ['content_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps.examination': {
+            'handlers': ['examination_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
         },
         'celery': {
             'handlers': ['console', 'file'],
