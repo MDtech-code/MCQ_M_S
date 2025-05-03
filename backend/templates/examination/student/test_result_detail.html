@@ -1,0 +1,52 @@
+```html
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Test Result - MCQ Master{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1 class="text-center mb-4" data-aos="fade-up">Test Result: {{ attempt.test.title }}</h1>
+  <div class="row justify-content-center">
+    <div class="col-md-10">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h5>Score: {{ attempt.score }} / {{ attempt.test.questions.count }}</h5>
+          <p>Accuracy: {{ performance_metrics.accuracy|floatformat:2 }}%</p>
+          <p>Average Time per Question: {{ performance_metrics.avg_time_per_question|floatformat:1 }} seconds</p>
+        </div>
+      </div>
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-3">Responses</h5>
+          {% for response in responses %}
+            <div class="mb-4">
+              <h6>{{ forloop.counter }}. {{ response.question.question_text }}</h6>
+              <p>
+                Your Answer: {{ response.selected_answer }} 
+                {% if response.is_correct %}
+                  <span class="text-success"><i class="bi bi-check-circle"></i> Correct</span>
+                {% else %}
+                  <span class="text-danger"><i class="bi bi-x-circle"></i> Incorrect (Correct: {{ response.question.correct_answer }})</span>
+                {% endif %}
+              </p>
+              <p>Time Taken: {{ response.time_taken }} seconds</p>
+            </div>
+          {% endfor %}
+          <div class="text-center mt-4">
+            <a href="{% url 'test_results' %}" class="btn btn-outline-primary">Back to Results</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

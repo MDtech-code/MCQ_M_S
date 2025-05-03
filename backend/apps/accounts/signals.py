@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver,Signal
-from .models import User, StudentProfile, TeacherProfile,EmailVerificationToken
+from .models import User, StudentProfile, TeacherProfile,EmailVerificationToken,ApprovalRequest
 
 import logging
 from apps.accounts.tasks import send_welcome_email_task,send_verification_email_task
@@ -28,21 +28,26 @@ def handle_user_creation(sender, instance, created, **kwargs):
     # Auto-update role for staff users
     if instance.is_staff and instance.role != User.Role.ADMIN:
         instance.role = User.Role.ADMIN
+        instance.is_approved = True
         instance.save()
     
     # Create profile only for non-ADMIN roles
-    if created and instance.role != User.Role.ADMIN:
-        try:
-            if instance.role == User.Role.STUDENT:
-                StudentProfile.objects.get_or_create(user=instance)
-            elif instance.role == User.Role.TEACHER:
-                TeacherProfile.objects.get_or_create(user=instance)
-            # Trigger verification email
-            token = EmailVerificationToken.objects.create(user=instance)
-            send_verification_email_task.delay(instance.id, token.token)
-            logger.info(f"Triggered verification email for {instance.email}")
-        except Exception as e:
-            logger.error(f"Profile creation failed for {instance}: {str(e)}")
+    if created:
+        if instance.role == User.Role.TEACHER:
+            instance.is_approved = False
+            instance.save()
+        if instance.role != User.Role.ADMIN:
+            try:
+                if instance.role == User.Role.STUDENT:
+                    StudentProfile.objects.get_or_create(user=instance)
+                elif instance.role == User.Role.TEACHER:
+                    TeacherProfile.objects.get_or_create(user=instance)
+                    
+                token = EmailVerificationToken.objects.create(user=instance)
+                send_verification_email_task.delay(instance.id, token.token)
+                logger.info(f"Triggered verification email for {instance.email}")
+            except Exception as e:
+                logger.error(f"Profile creation failed for {instance}: {str(e)}")
 
 
 
@@ -71,7 +76,12 @@ def update_profile_on_role_change(sender, instance, **kwargs):
 
 
 
-
+@receiver(post_save, sender=ApprovalRequest)
+def update_teacher_profile_on_approval(sender, instance, created, **kwargs):
+    if not created and instance.status == ApprovalRequest.Status.APPROVED:
+        teacher_profile = instance.user.teacherprofile
+        teacher_profile.qualifications = instance.qualifications
+        teacher_profile.save()
 
 
 

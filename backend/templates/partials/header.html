@@ -1,0 +1,130 @@
+<!-- Hero Section -->
+{% load static %}
+<section class="hero-section py-6">
+  <div class="container">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-6 order-lg-1 order-2">
+        <div class="hero-content position-relative z-2">
+          <h1 class="display-3 fw-bold mb-4" data-aos="fade-up">
+            <span class="d-block mb-3">Ace Every Test with</span>
+            <span class="text-primary-gradient">Smart MCQ Mastery</span>
+          </h1>
+          <p class="lead mb-4 fs-lg" data-aos="fade-up" data-aos-delay="50">
+            Revolutionize your exam preparation through adaptive learning algorithms<br class="d-none d-lg-block">
+            and AI-powered performance analytics.
+          </p>
+          <div class="d-flex flex-wrap gap-3" data-aos="fade-up" data-aos-delay="100">
+            <a href="{% url 'signup' %}" class="btn btn-primary btn-lg px-5 rounded-pill shadow-hover">
+              <i class="bi bi-rocket me-2"></i>Start Free Trial
+            </a>
+            <a href="#features" class="btn btn-outline-primary btn-lg px-5 rounded-pill">
+              Learn More
+            </a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-lg-6 order-lg-2 order-1" data-aos="zoom-in" data-aos-delay="150">
+        <div class="hero-visual position-relative">
+          <div class="blob-container">
+            <div class="blob blue-blob"></div>
+            <div class="blob purple-blob"></div>
+          </div>
+          <div class="image-container rounded-4 overflow-hidden shadow-lg">
+            <img src="{% static 'images/hero-section.jpg' %}" 
+                 alt="Learning interface"
+                 class="img-fluid position-relative"
+                 loading="lazy">
+            <div class="stats-card card border-0 shadow-sm">
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+.hero-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.text-primary-gradient {
+  background: linear-gradient(45deg, #2a4a8d, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-visual {
+  max-width: 600px;
+  margin-left: auto;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.15;
+  z-index: -1;
+}
+
+.blue-blob {
+  width: 400px;
+  height: 400px;
+  background: #3b82f6;
+  top: -20%;
+  right: -10%;
+}
+
+.purple-blob {
+  width: 350px;
+  height: 350px;
+  background: #6366f1;
+  bottom: -20%;
+  left: -10%;
+}
+
+.image-container {
+  position: relative;
+  border: 3px solid white;
+}
+
+.stats-card {
+  position: absolute;
+  bottom: -30px;
+  right: -30px;
+  width: 200px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+}
+
+.icon-wrapper {
+  width: 45px;
+  height: 45px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shadow-hover {
+  transition: all 0.3s ease;
+}
+
+.shadow-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px rgba(59,130,246,0.2);
+}
+
+@media (max-width: 992px) {
+  .hero-section {
+    text-align: center;
+  }
+  .stats-card {
+    right: 0;
+    bottom: -40px;
+  }
+}
+</style>

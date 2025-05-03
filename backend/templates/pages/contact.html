@@ -1,0 +1,87 @@
+{% extends "base/base.html" %}
+{% block title %}Contact Us - MCQ Master{% endblock %}
+{% block content %}
+
+<main class="container ">  <!-- Added top margin -->
+  <!-- Contact Header -->
+  <section class="mb-5">
+    <div class="text-center">
+      <h1 class="display-4 fw-bold mb-3">Contact Us</h1>
+      <p class="lead text-muted">We're here to answer your questions</p>
+    </div>
+  </section>
+
+  <!-- Contact Content -->
+  <section class="py-5 border-top">
+    <div class="row g-5">
+      <!-- Contact Form -->
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm p-4">
+          <h2 class="mb-4 h2 fw-bold">Send a Message</h2>
+          <form>
+            <div class="mb-4">
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-control form-control-lg">
+            </div>
+            <div class="mb-4">
+              <label class="form-label">Email Address</label>
+              <input type="email" class="form-control form-control-lg">
+            </div>
+            <div class="mb-4">
+              <label class="form-label">Message</label>
+              <textarea class="form-control form-control-lg" rows="5"></textarea>
+            </div>
+            <button class="btn btn-primary btn-lg w-100">
+              Send Message <i class="bi bi-send ms-2"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm p-4 h-100">
+          <h2 class="mb-4 h2 fw-bold">Contact Information</h2>
+          <div class="d-flex align-items-start mb-4">
+            <i class="bi bi-geo-alt fs-4 text-primary me-3"></i>
+            <div>
+              <h4 class="h5 fw-bold">Office Address</h4>
+              <p class="text-muted mb-0">123 Education Street<br>Tech City, TC 45678</p>
+            </div>
+          </div>
+          <div class="d-flex align-items-start mb-4">
+            <i class="bi bi-envelope fs-4 text-primary me-3"></i>
+            <div>
+              <h4 class="h5 fw-bold">Email</h4>
+              <p class="text-muted mb-0">support@mcqmaster.com</p>
+            </div>
+          </div>
+          <div class="d-flex align-items-start">
+            <i class="bi bi-telephone fs-4 text-primary me-3"></i>
+            <div>
+              <h4 class="h5 fw-bold">Phone</h4>
+              <p class="text-muted mb-0">+1 (555) 123-4567</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<style>
+.card {
+  border-radius: 1rem;
+}
+
+.form-control-lg {
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.bi {
+  min-width: 1.5em;
+}
+</style>
+
+{% endblock %}

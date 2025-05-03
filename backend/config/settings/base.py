@@ -33,7 +33,11 @@ PROJECT_APPS = [
     'apps.content',
     'apps.examination',
     'apps.analytics',
-]
+    'apps.common',
+    'apps.public',
+    'apps.nlp_generator',
+    'apps.notifications',
+    ]
 
 THIRD_PARTY_APPS = [
     'rest_framework',
@@ -61,7 +65,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -69,6 +73,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.common.context_processors.global_context',
+
             ],
         },
     },
@@ -112,6 +118,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     
 ]
+LOGIN_REDIRECT_URL = 'home'
+LOGIN_URL = 'login'
+LOGOUT_REDIRECT_URL = None
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -121,8 +130,8 @@ USE_TZ = True
 
 # Static files
 STATIC_URL = 'static/'
-# STATIC_ROOT = BASE_DIR / 'staticfiles'
-# STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -142,9 +151,11 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.TokenAuthentication', 
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.common.authentication.CookieTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ),
+        # 'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # 'rest_framework.authentication.TokenAuthentication', 
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],

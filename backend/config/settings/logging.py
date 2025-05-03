@@ -17,13 +17,13 @@ LOGGING = {
         'content_file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': 'content.log',
+            'filename': 'logs/content.log',
             'formatter': 'verbose',
         },
         'examination_file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': 'examination.log',
+            'filename': 'logs/examination.log',
             'formatter': 'verbose',
         },
         'console': {

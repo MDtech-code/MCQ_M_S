@@ -1,0 +1,539 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Question List - MCQ Master{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+<style>
+    .card {
+        border: none;
+        border-radius: 1.25rem;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+        background: linear-gradient(145deg, #ffffff, #f8f9fa);
+    }
+    .card-body {
+        padding: 2rem;
+    }
+    .btn-primary {
+        background-color: #007bff;
+        border-color: #007bff;
+        padding: 0.8rem 2rem;
+        border-radius: 0.75rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+        background-color: #0056b3;
+        border-color: #0056b3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+    }
+    .btn-outline-secondary {
+        border-radius: 0.75rem;
+        padding: 0.8rem 2rem;
+        font-weight: 500;
+    }
+    .btn-outline-danger {
+        border-radius: 0.5rem;
+        padding: 0.5rem 1rem;
+    }
+    .form-select, .form-control {
+        border-radius: 0.5rem;
+        height: calc(3.5rem + 2px);
+    }
+    .select2-container--default .select2-selection--single {
+        border: 1px solid #ced4da;
+        border-radius: 0.5rem;
+        height: calc(3.5rem + 2px);
+        display: flex;
+        align-items: center;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: calc(3.5rem - 2px);
+    }
+    .table {
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    .table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        color: #343a40;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+    .action-bar {
+        position: sticky;
+        top: 1rem;
+        z-index: 1000;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .modal-content {
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    .modal-header {
+        background-color: #f8f9fa;
+        border-top-left-radius: 1rem;
+        border-top-right-radius: 1rem;
+    }
+    .pagination .page-link {
+        border-radius: 0.5rem;
+        margin: 0 0.25rem;
+        color: #007bff;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: #007bff;
+        border-color: #007bff;
+    }
+    @media (max-width: 576px) {
+        .card-body {
+            padding: 1.5rem;
+        }
+        .btn-primary, .btn-outline-secondary {
+            padding: 0.6rem 1.5rem;
+            font-size: 0.9rem;
+        }
+        .action-bar {
+            flex-direction: column;
+            align-items: flex-end;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="text-center mb-5" data-aos="fade-up">My Questions</h1>
+    
+    <!-- Action Bar -->
+    <div class="action-bar" data-aos="fade-left">
+        <a href="{% url 'question_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Create New Question
+        </a>
+        <a href="{% url 'generate_mcq' %}" class="btn btn-primary">
+            <i class="bi bi-lightning-charge me-2"></i>Generate MCQ
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-12">
+            <!-- Filter Form -->
+            <div class="card mb-5" data-aos="fade-up" data-aos-delay="100">
+                <div class="card-body">
+                    <h5 class="card-title mb-4"><i class="bi bi-funnel me-2"></i>Filter Questions</h5>
+                    <form method="get" action="{% url 'question_list' %}" id="filter-form">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-sm-6">
+                                <label for="difficulty" class="form-label">Difficulty</label>
+                                <select class="form-select" id="difficulty" name="difficulty">
+                                    <option value="">All</option>
+                                    <option value="E" {% if current_filters.difficulty == 'E' %}selected{% endif %}>Easy</option>
+                                    <option value="M" {% if current_filters.difficulty == 'M' %}selected{% endif %}>Medium</option>
+                                    <option value="H" {% if current_filters.difficulty == 'H' %}selected{% endif %}>Hard</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label for="subject" class="form-label">Subject</label>
+                                <select class="form-select select2" id="subject" name="subject">
+                                    <option value="">All</option>
+                                    {% for subject in subjects %}
+                                        <option value="{{ subject.id }}" {% if current_filters.subject == subject.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ subject.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label for="topic" class="form-label">Topic</label>
+                                <select class="form-select select2" id="topic" name="topic">
+                                    <option value="">All</option>
+                                    {% for topic in topics %}
+                                        <option value="{{ topic.id }}" {% if current_filters.topic == topic.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ topic.subject.name }} - {{ topic.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="">All</option>
+                                    <option value="PENDING" {% if current_filters.status == 'PENDING' %}selected{% endif %}>Pending</option>
+                                    <option value="APPROVED" {% if current_filters.status == 'APPROVED' %}selected{% endif %}>Approved</option>
+                                    <option value="REJECTED" {% if current_filters.status == 'REJECTED' %}selected{% endif %}>Rejected</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label for="created_after" class="form-label">Created After</label>
+                                <input type="date" class="form-control" id="created_after" name="created_after" value="{{ current_filters.created_after|default:'' }}">
+                            </div>
+                            <div class="col-md-3 col-sm-6 align-self-end">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-funnel-fill me-2"></i>Apply Filters
+                                </button>
+                            </div>
+                            <div class="col-md-3 col-sm-6 align-self-end">
+                                <button type="button" class="btn btn-outline-secondary w-100" onclick="resetFilters()">
+                                    <i class="bi bi-x-circle me-2"></i>Reset Filters
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Question Table -->
+            <div class="card" data-aos="fade-up" data-aos-delay="200">
+                <div class="card-body">
+                    <h5 class="card-title mb-4"><i class="bi bi-list-ul me-2"></i>Question List</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th scope="col">ID</th>
+                                    <th scope="col">Question Text</th>
+                                    <th scope="col">Difficulty</th>
+                                    <th scope="col">Topics</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for question in results %}
+                                    <tr>
+                                        <td>{{ question.id }}</td>
+                                        <td>{{ question.question_text|truncatechars:50 }}</td>
+                                        <td>
+                                            {% if question.difficulty == 'E' %}
+                                                <span class="badge bg-success">Easy</span>
+                                            {% elif question.difficulty == 'M' %}
+                                                <span class="badge bg-warning">Medium</span>
+                                            {% elif question.difficulty == 'H' %}
+                                                <span class="badge bg-danger">Hard</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% for topic in question.topics.all %}
+                                                {{ topic.name }}{% if not forloop.last %}, {% endif %}
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% if question.approval.status == 'PENDING' %}
+                                                <span class="badge bg-secondary">Pending</span>
+                                            {% elif question.approval.status == 'APPROVED' %}
+                                                <span class="badge bg-success">Approved</span>
+                                            {% elif question.approval.status == 'REJECTED' %}
+                                                <span class="badge bg-danger">Rejected</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'question_update' pk=question.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-pencil me-1"></i>Edit
+                                            </a>
+                                            {% if question.approval.status != 'APPROVED' %}
+                                                <button type="button" class="btn btn-sm btn-outline-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteModal" data-question-id="{{ question.id }}">
+                                                    <i class="bi bi-trash me-1"></i>Delete
+                                                </button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4">No questions found.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Pagination -->
+                    {% if results.has_other_pages %}
+                        <nav aria-label="Page navigation">
+                            <ul class="pagination justify-content-center mt-4">
+                                {% if results.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ results.previous_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">« Previous</a>
+                                    </li>
+                                {% endif %}
+                                {% for num in results.paginator.page_range %}
+                                    <li class="page-item {% if results.number == num %}active{% endif %}">
+                                        <a class="page-link" href="?page={{ num }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">{{ num }}</a>
+                                    </li>
+                                {% endfor %}
+                                {% if results.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ results.next_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">Next »</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Delete Confirmation Modal -->
+            <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="deleteModalLabel"><i class="bi bi-exclamation-triangle me-2"></i>Confirm Delete</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            Are you sure you want to delete this question? This action cannot be undone.
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <form id="deleteForm" method="post" action="">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-2"></i>Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+<script>
+    // Initialize AOS
+    AOS.init({
+        duration: 800,
+        once: true
+    });
+
+    // Initialize Select2 for subject and topic
+    $(document).ready(function() {
+        $('#subject, #topic').select2({
+            placeholder: 'Select an option',
+            allowClear: true,
+            width: '100%'
+        });
+    });
+
+    // Delete modal action
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteButtons = document.querySelectorAll('[data-question-id]');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const questionId = this.getAttribute('data-question-id');
+                const deleteForm = document.getElementById('deleteForm');
+                deleteForm.action = `/api/questions/${questionId}/delete/`;
+            });
+        });
+    });
+
+    // Reset filters
+    function resetFilters() {
+        const form = document.getElementById('filter-form');
+        form.querySelectorAll('select, input').forEach(input => {
+            if (input.tagName === 'SELECT') {
+                input.value = '';
+                $(input).trigger('change'); // Refresh Select2
+            } else {
+                input.value = '';
+            }
+        });
+        form.submit();
+    }
+</script>
+{% endblock %}
+{% comment %} {% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Question List - MCQ Master{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1 class="text-center mb-4" data-aos="fade-up">My Questions</h1>
+  <div class="row justify-content-center">
+    <div class="col-md-10">
+      
+      <!-- Filter Form -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <form method="get" action="{% url 'question_list' %}">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label for="difficulty" class="form-label">Difficulty</label>
+                <select class="form-select" id="difficulty" name="difficulty">
+                  <option value="">All</option>
+                  <option value="E" {% if current_filters.difficulty == 'E' %}selected{% endif %}>Easy</option>
+                  <option value="M" {% if current_filters.difficulty == 'M' %}selected{% endif %}>Medium</option>
+                  <option value="H" {% if current_filters.difficulty == 'H' %}selected{% endif %}>Hard</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="subject" class="form-label">Subject</label>
+                <select class="form-select" id="subject" name="subject">
+                  <option value="">All</option>
+                  {% for subject in subjects %}
+                    <option value="{{ subject.id }}" {% if current_filters.subject == subject.id|stringformat:"s" %}selected{% endif %}>
+                      {{ subject.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="topic" class="form-label">Topic</label>
+                <select class="form-select" id="topic" name="topic">
+                  <option value="">All</option>
+                  {% for topic in topics %}
+                    <option value="{{ topic.id }}" {% if current_filters.topic == topic.id|stringformat:"s" %}selected{% endif %}>
+                      {{ topic.subject.name }} - {{ topic.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                  <option value="">All</option>
+                  <option value="PENDING" {% if current_filters.status == 'PENDING' %}selected{% endif %}>Pending</option>
+                  <option value="APPROVED" {% if current_filters.status == 'APPROVED' %}selected{% endif %}>Approved</option>
+                  <option value="REJECTED" {% if current_filters.status == 'REJECTED' %}selected{% endif %}>Rejected</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="created_after" class="form-label">Created After</label>
+                <input type="date" class="form-control" id="created_after" name="created_after" value="{{ current_filters.created_after|default:'' }}">
+              </div>
+              <div class="col-md-3 align-self-end">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+      <!-- Question Table -->
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Question Text</th>
+                  <th>Difficulty</th>
+                  <th>Topics</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for question in results %}
+                  <tr>
+                    <td>{{ question.id }}</td>
+                    <td>{{ question.question_text|truncatechars:50 }}</td>
+                    <td>
+                      {% if question.difficulty == 'E' %}Easy
+                      {% elif question.difficulty == 'M' %}Medium
+                      {% elif question.difficulty == 'H' %}Hard
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% for topic in question.topics.all %}
+                        {{ topic.name }}{% if not forloop.last %}, {% endif %}
+                      {% endfor %}
+                    </td>
+                    <td>{{ question.approval.status }}</td>
+                    <td>
+                      <a href="{% url 'question_update' pk=question.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                      {% if question.approval.status != 'APPROVED' %}
+                        <form action="{% url 'question_delete' pk=question.id %}" method="post" class="d-inline">
+                          {% csrf_token %}
+                          
+                          <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" data-question-id="{{ question.id }}">Delete</button>
+                        </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="6" class="text-center">No questions found.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <!-- Pagination -->
+          {% if results.has_other_pages %}
+            <nav aria-label="Page navigation">
+              <ul class="pagination justify-content-center mt-3">
+                {% if results.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ results.previous_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">&laquo; Previous</a>
+                  </li>
+                {% endif %}
+                {% for num in results.paginator.page_range %}
+                  <li class="page-item {% if results.number == num %}active{% endif %}">
+                    <a class="page-link" href="?page={{ num }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">{{ num }}</a>
+                  </li>
+                {% endfor %}
+                {% if results.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ results.next_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">Next &raquo;</a>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+          {% endif %}
+        </div>
+      </div>
+      <!-- Delete Confirmation Modal -->
+      <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              Are you sure you want to delete this question? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <form id="deleteForm" method="post" action="">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Delete</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="text-center mt-4">
+        <a href="{% url 'question_create' %}" class="btn btn-primary">Create New Question</a>
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary ms-2">Back to Dashboard</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const deleteButtons = document.querySelectorAll('[data-question-id]');
+    deleteButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const questionId = this.getAttribute('data-question-id');
+        const deleteForm = document.getElementById('deleteForm');
+        deleteForm.action = `/api/questions/${questionId}/delete/`;
+      });
+    });
+  });
+</script>
+{% endblock %}
+{% endblock %} {% endcomment %}

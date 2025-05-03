@@ -1,0 +1,81 @@
+{% extends 'base/base.html' %}
+{% block title %}Teacher Credentials - MCQ Master{% endblock %}
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4 fw-bold">Submit Teacher Credentials</h2>
+                    {% if approval_request %}
+                        <div class="alert alert-info d-flex align-items-center">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Your credentials are pending approval. You’ll be notified once reviewed.
+                        </div>
+                    {% else %}
+                        {% if rejection_reason %}
+                            <div class="alert alert-warning d-flex align-items-center">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                Your previous submission was rejected: {{ rejection_reason }}
+                            </div>
+                        {% endif %}
+                        <form method="post" id="approval-form" class="needs-validation" novalidate enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="id_qualifications" class="form-label text-muted">
+                                    <i class="bi bi-award me-2"></i>Qualifications
+                                </label>
+                                <textarea class="form-control" id="id_qualifications" name="qualifications" rows="4"
+                                          placeholder="e.g., Master's in Physics, Teaching Certificate" required>{{ form_data.qualifications|default:'' }}</textarea>
+                                <div class="form-text">Enter your professional certifications and degrees.</div>
+                                <div class="invalid-feedback">Please provide your qualifications.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="id_document" class="form-label text-muted">
+                                    <i class="bi bi-file-earmark-text me-2"></i>Upload HEC-Approved Document
+                                </label>
+                                <input type="file" class="form-control" id="id_document" name="document"
+                                       accept=".pdf,.jpg,.jpeg,.png" required>
+                                <div class="form-text">Upload your degree, CV, or teaching certificate (PDF, JPEG, PNG, max 5MB).</div>
+                                <div class="invalid-feedback">Please upload a document.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="id_message" class="form-label text-muted">
+                                    <i class="bi bi-chat-text me-2"></i>Message (Optional)
+                                </label>
+                                <textarea class="form-control" id="id_message" name="message" rows="4"
+                                          placeholder="Additional information for admins">{{ form_data.message|default:'' }}</textarea>
+                            </div>
+                            {% if errors %}
+                                <div class="alert alert-danger d-flex align-items-center">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                    <div>
+                                        {% for field, error in errors.items %}
+                                            {{ error.0 }}<br>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary btn-lg w-100">Submit Credentials</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('.needs-validation');
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+</script>
+{% endblock %}
+{% endblock %}

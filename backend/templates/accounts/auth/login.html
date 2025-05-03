@@ -1,0 +1,113 @@
+{% extends 'base/base.html' %}
+{% block title %}Log In - MCQ Master{% endblock %}
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4 fw-bold">Welcome Back</h2>
+                    
+                    <form method="post" id="login-form" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Username Field -->
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="id_username" name="username" 
+                                   placeholder="Username" value="{{ form_data.username|default:'' }}" required>
+                            <label for="username" class="text-muted">
+                                <i class="bi bi-person-circle me-2"></i>Username
+                            </label>
+                        </div>
+
+                        <!-- Password Field -->
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control password-input" id="id_password" 
+                                   name="password" placeholder="Password" required>
+                            <label for="password" class="text-muted">
+                                <i class="bi bi-lock me-2"></i>Password
+                            </label>
+                            <button type="button" class="btn btn-link password-toggle" aria-label="Show password">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+
+                        <!-- Remember Me & Forgot Password -->
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="remember" name="remember">
+                                <label class="form-check-label text-muted" for="remember">
+                                    Remember me
+                                </label>
+                            </div>
+                            <a href="{% url 'forgot_password' %}" class="text-decoration-none text-primary">
+                                Forgot Password?
+                            </a>
+                        </div>
+
+                        <!-- Error Messages -->
+                        {% if errors %}
+                        <div class="alert alert-danger d-flex align-items-center" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <div>
+                                {% for field, error in errors.items %}
+                                    {{ error.0 }}<br>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                            Log In
+                        </button>
+
+                        <!-- Signup Link -->
+                        <p class="text-center text-muted mb-0">
+                            Don't have an account? 
+                            <a href="{% url 'signup' %}" class="text-decoration-none fw-bold">Sign Up</a>
+                        </p>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+<!-- Include the same styles and JavaScript as signup.html -->
+{% comment %} {% extends 'base/base.html' %}
+{% block title %}Log In - MCQ Master{% endblock %}
+{% block content %}
+<div class="container py-5">
+    <h1 class="text-center mb-4">Log In</h1>
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <form method="post" action="{% url 'login' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control" id="username" name="username" value="{{ form_data.username|default:'' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                </div>
+                {% if errors %}
+                    <div class="alert alert-danger">
+                        {% for field, error in errors.items %}
+                            {% for err in error %}
+                                <p>{{ err }}</p>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <button type="submit" class="btn btn-primary w-100">Log In</button>
+            </form>
+            <p class="text-center mt-3">
+                Don't have an account? <a href="{% url 'signup' %}">Sign Up</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %} {% endcomment %}

@@ -1,0 +1,114 @@
+{% extends "base/base.html" %}
+{% block title %}About Us - MCQ Master{% endblock %}
+{% block content %}
+
+<main class="container mt-5 pt-4">  <!-- Added top margin -->
+  <!-- Hero Section -->
+  <section class="mb-5 pb-5">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-6">
+        <h1 class="display-4 fw-bold mb-4">Transforming Education Through Technology</h1>
+        <p class="lead text-muted">
+          Empowering educators and students with intelligent assessment solutions
+        </p>
+        <a href="{% url 'signup' %}" class="btn btn-primary btn-lg px-4">
+          Get Started <i class="bi bi-arrow-right ms-2"></i>
+        </a>
+      </div>
+      <div class="col-lg-6">
+        <div class="ratio ratio-16x9 bg-light rounded-3 shadow">
+          <!-- Placeholder for illustration -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="py-5 border-top border-bottom">
+    <div class="container">
+      <h2 class="text-center mb-5 display-5 fw-bold">Why Choose Us</h2>
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 border-0 shadow-sm p-3">
+            <div class="card-body">
+              <div class="icon-square bg-primary text-white rounded-circle mb-3">
+                <i class="bi bi-speedometer2 fs-4"></i>
+              </div>
+              <h3 class="h4">Smart Analytics</h3>
+              <p class="text-muted">Real-time performance tracking and insights</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+        <div class="card h-100 border-0 shadow-hover">
+          <div class="card-body p-4">
+            <div class="icon-wrapper bg-primary-soft mb-3">
+              <i class="bi bi-shield-check text-primary fs-2"></i>
+            </div>
+            <h3 class="h4 mb-3">Secure Platform</h3>
+            <p class="text-muted">Enterprise-grade security protecting all user data and interactions</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 border-0 shadow-hover">
+          <div class="card-body p-4">
+            <div class="icon-wrapper bg-primary-soft mb-3">
+              <i class="bi bi-graph-up-arrow text-primary fs-2"></i>
+            </div>
+            <h3 class="h4 mb-3">Adaptive Learning</h3>
+            <p class="text-muted">AI-powered recommendations based on individual performance patterns</p>
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mission Section -->
+  <section class="py-5">
+    <div class="container">
+      <div class="row g-5 align-items-center">
+        <div class="col-lg-6 order-lg-2">
+          <div class="ratio ratio-16x9 bg-light rounded-3 shadow">
+            <!-- Mission illustration -->
+          </div>
+        </div>
+        <div class="col-lg-6 order-lg-1">
+          <h2 class="display-5 fw-bold mb-4">Our Mission</h2>
+          <p class="lead text-muted">
+            To revolutionize exam preparation through adaptive learning technologies
+          </p>
+          <ul class="list-unstyled">
+            <li class="d-flex mb-3">
+              <i class="bi bi-check-circle-fill text-primary me-2"></i>
+              Personalized learning paths
+            </li>
+            <!-- Add more list items -->
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<style>
+.icon-square {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  transition: transform 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+}
+</style>
+
+{% endblock %}

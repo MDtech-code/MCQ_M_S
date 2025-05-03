@@ -51,8 +51,14 @@ class User(AbstractUser):
         default=False,
         help_text=_('Designates whether the user has verified their email')
     )
+
+    is_approved = models.BooleanField(
+        _('approved status'),
+        default=True,  # Students/Admins default approved
+        help_text=_('Designates whether the user (teacher) is approved by admin')
+    )
     
-    # Related model configurations
+    
     groups = models.ManyToManyField(
         Group,
         verbose_name=_('groups'),
@@ -86,6 +92,7 @@ class User(AbstractUser):
                 name='unverified_users_idx'
             ),
             models.Index(fields=['role']),
+            models.Index(fields=['is_approved']),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -100,14 +107,12 @@ class User(AbstractUser):
 
         ordering = ['-date_joined']
 
-    def __str__(self) -> str:
-        """String representation using email and role"""
-        return f"{self.username} ({self.get_role_display()})"
+    
     def clean(self):
         """Validate role consistency"""
         super().clean()
         
-        # Enforce ADMIN role requires staff status
+        
         if self.role == User.Role.ADMIN and not self.is_staff:
             raise ValidationError({
                 'role': _('ADMIN role requires staff status.')
@@ -118,21 +123,19 @@ class User(AbstractUser):
             raise ValidationError({
                 'role': _('Only staff members can have ADMIN role.')
             })
-    # def save(self, *args, **kwargs) -> None:
-    #     """
-    #     Save user while ensuring role-based group assignment.
-    #     Uses atomic transaction for data integrity.
-    #     """
-    #     with transaction.atomic():
-    #         super().save(*args, **kwargs)
-    #         if self._state.adding:  # Only on creation
-    #             self._assign_role_group()
+        # Teachers require approval
+        if self.role == User.Role.TEACHER and self.is_approved is None:
+            self.is_approved = False
+    
     def save(self, *args, **kwargs):
         """
         Automatically enforce role consistency during save.
         """
         if self.is_staff and  self.is_superuser:
             self.role = User.Role.ADMIN
+            self.is_approved = True
+        elif self.role == User.Role.TEACHER and self.is_approved is None:
+            self.is_approved = False
         super().save(*args, **kwargs)
     
 
@@ -160,6 +163,11 @@ class User(AbstractUser):
             except TeacherProfile.DoesNotExist:
                 return None
         return None
+    
+
+    def __str__(self) -> str:
+        """String representation using email and role"""
+        return f"{self.username} ({self.get_role_display()})"
 
 
 
@@ -171,10 +179,15 @@ class EmailVerificationToken(TimeStampedModel):
     )
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     expires_at = models.DateTimeField()
+    new_email = models.EmailField(blank=True, null=True)
 
     class Meta:
         verbose_name = _('email verification token')
         verbose_name_plural = _('email verification tokens')
+
+        indexes = [
+            models.Index(fields=['token']),  # New
+        ]
 
     def save(self, *args, **kwargs):
         if not self.expires_at:
@@ -222,12 +235,7 @@ class BaseProfile(TimeStampedModel):
         UNDISCLOSED = 'UD', _('Prefer not to say')
        
 
-    # user = models.OneToOneField(
-    #     User,
-    #     on_delete=models.CASCADE,
-    #     primary_key=True,
-    #     related_name='%(class)s_profile'
-    # )
+   
     phone_number = models.CharField(
         _('phone number'),
         max_length=20,
@@ -344,7 +352,37 @@ class TeacherProfile(BaseProfile):
 
 
 
+class ApprovalRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = 'PE', _('Pending')
+        APPROVED = 'AP', _('Approved')
+        REJECTED = 'RE', _('Rejected')
 
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='approval_requests')
+    message = models.TextField(blank=True, help_text=_('Optional message from teacher'))
+    document = models.FileField(upload_to='approval_documents/%Y/%m/%d/', blank=True, null=True)
+    status = models.CharField(max_length=2, choices=Status.choices, default=Status.PENDING)
+    qualifications = models.TextField(
+        help_text=_('Professional certifications and degrees')
+    )
+    rejection_reason = models.TextField(blank=True, help_text=_('Reason for rejection, if any'))
+    
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'status'], name='unique_pending_request')
+        ]
+
+    def clean(self):
+        if self.status == 'PE' and ApprovalRequest.objects.filter(user=self.user, status='PE').exists():
+            raise ValidationError("User can have only one pending request.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Approval Request for {self.user.username} ({self.status})"
 
 
 

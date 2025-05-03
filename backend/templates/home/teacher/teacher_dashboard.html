@@ -1,0 +1,114 @@
+
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Teacher Dashboard - MCQ Master{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1 class="text-center mb-4" data-aos="fade-up">Welcome, {{ user.get_full_name|default:user.email }}!</h1>
+  <div class="row justify-content-center">
+    <div class="col-md-10">
+      
+      {% if not user.is_verified %}
+                <div class="alert alert-warning text-center" role="alert">
+                    <i class="bi bi-envelope-exclamation-fill"></i> Your email is not verified.
+                    <form method="post" action="{% url 'resend_verification' %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link p-0">Resend verification email</button>.
+                    </form>
+                </div>
+            {% elif user.role == User.Role.TEACHER and not user.is_approved %}
+                <div class="alert alert-info text-center" role="alert">
+                    <i class="bi bi-info-circle-fill"></i> Your account is awaiting admin approval.
+                </div>
+            {% endif %}
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <div class="card shadow-sm text-center">
+            <div class="card-body">
+              <h5 class="card-title">Create New Test</h5>
+              <p class="card-text">Design a new MCQ test for your students.</p>
+              <a href="{% url 'test_create' %}" class="btn btn-primary">Create Test</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card shadow-sm text-center">
+            <div class="card-body">
+              <h5 class="card-title">Manage Tests</h5>
+              <p class="card-text">View or edit your existing tests.</p>
+              <a href="{% url 'test_list' %}" class="btn btn-primary">View Tests</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card shadow-sm text-center">
+            <div class="card-body">
+              <h5 class="card-title">View Results</h5>
+              <p class="card-text">Check student performance on tests.</p>
+              <a href="#" class="btn btn-primary">View Results</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Recent Tests</h5>
+        </div>
+        <div class="card-body">
+          {% if recent_tests %}
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Subjects</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for test in recent_tests %}
+                  <tr>
+                    <td>{{ test.title }}</td>
+                    <td>{{ test.subjects.all|join:", " }}</td>
+                    <td>{{ test.created_at|date:"Y-m-d" }}</td>
+                    <td>
+                      <a href="{% url 'test_update' test.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                      <a href="{% url 'test_results' test.id %}" class="btn btn-sm btn-outline-info">Results</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="text-muted">No tests created yet.</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h5 class="mb-0">Profile Snapshot</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4 text-center">
+              {% if profile.avatar %}
+                <img src="{{ profile.avatar.url }}" alt="Avatar" class="rounded-circle" style="width: 100px; height: 100px; object-fit: cover;">
+              {% else %}
+                <img src="{% static 'images/default_male.jpg' %}" alt="Default Avatar" class="rounded-circle" style="width: 100px; height: 100px;">
+              {% endif %}
+            </div>
+            <div class="col-md-8">
+              <p><strong>Email:</strong> {{ user.email }}</p>
+              <p><strong>Department:</strong> {{ profile.department|default:"Not set" }}</p>
+              <p><strong>Qualifications:</strong> {{ profile.qualifications|default:"Not set" }}</p>
+              <a href="{% url 'profile' %}" class="btn btn-outline-primary">View Full Profile</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

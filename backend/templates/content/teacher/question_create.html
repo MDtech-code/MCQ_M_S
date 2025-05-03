@@ -1,0 +1,434 @@
+{% extends 'base/base.html' %}
+{% load static form_tags %}
+
+{% block title %}Create Question - MCQ Master{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+<style>
+    .form-floating > .form-control, .form-floating > .form-select {
+        height: calc(3.5rem + 2px);
+        border-radius: 0.5rem;
+    }
+    .form-floating > label {
+        font-size: 0.95rem;
+        padding: 1rem 0.75rem;
+    }
+    .form-floating .bi {
+        font-size: 1rem;
+        margin-right: 0.75rem;
+        color: #6c757d;
+    }
+    .select2-container--default .select2-selection--multiple {
+        border: 1px solid #ced4da;
+        border-radius: 0.5rem;
+        min-height: 3.5rem;
+        padding: 0.5rem;
+        background-color: #fff;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 0.3rem 0.6rem;
+        margin: 0.3rem;
+        border-radius: 0.25rem;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        color: white;
+        margin-right: 0.3rem;
+    }
+    .card {
+        border: none;
+        border-radius: 1.25rem;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+        background: linear-gradient(145deg, #ffffff, #f8f9fa);
+    }
+    .card-body {
+        padding: 2.5rem;
+    }
+    .btn-primary {
+        background-color: #007bff;
+        border-color: #007bff;
+        padding: 0.8rem 2rem;
+        border-radius: 0.75rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+        background-color: #0056b3;
+        border-color: #0056b3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+    }
+    .btn-outline-secondary {
+        border-radius: 0.75rem;
+        padding: 0.8rem 2rem;
+        font-weight: 500;
+    }
+    .input-group-text {
+        background-color: #f1f3f5;
+        border-radius: 0.5rem 0 0 0.5rem;
+        font-weight: 500;
+        color: #495057;
+        width: 60px;
+        justify-content: center;
+    }
+    .input-group .form-control {
+        border-radius: 0 0.5rem 0.5rem 0;
+    }
+    .invalid-feedback {
+        font-size: 0.85rem;
+        color: #dc3545;
+    }
+    .form-label.fw-bold {
+        font-size: 1.1rem;
+        color: #343a40;
+        margin-bottom: 0.75rem;
+    }
+    @media (max-width: 576px) {
+        .card-body {
+            padding: 1.5rem;
+        }
+        .btn-primary, .btn-outline-secondary {
+            padding: 0.6rem 1.5rem;
+            font-size: 0.9rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="text-center mb-5" data-aos="fade-up">Create a New Question</h1>
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert" data-aos="fade-up">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            <div class="card" data-aos="fade-up" data-aos-delay="100">
+                <div class="card-body">
+                    <form method="post" action="{% url 'question_create' %}" class="needs-validation" novalidate id="question-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="question_type" value="MCQ">
+                        
+                        <!-- Subject -->
+                        <div class="mb-5">
+                            <div class="form-floating">
+                                <select class="form-select" id="subject" onchange="filterTopics()">
+                                    <option value="" selected>Select Subject</option>
+                                    {% for subject in subjects %}
+                                        <option value="{{ subject.id }}">{{ subject.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <label for="subject"><i class="bi bi-book"></i>Subject</label>
+                            </div>
+                        </div>
+
+                        <!-- Topics -->
+                        <div class="mb-5">
+                            <div class="form-floating">
+                                <select class="form-select" id="topics" name="topics" multiple required>
+                                    {% for topic in topics %}
+                                        <option value="{{ topic.id }}"
+                                                data-subject="{{ topic.subject.id }}"
+                                                {% if form_data.topics and topic.id|stringformat:"s" in form_data.topics %}selected{% endif %}>
+                                            {{ topic.subject.name }} - {{ topic.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <label for="topics"><i class="bi bi-tags"></i>Topics</label>
+                                {% if errors.topics %}
+                                    <div class="invalid-feedback d-block">{{ errors.topics|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Question Text -->
+                        <div class="mb-5">
+                            <div class="form-floating">
+                                <textarea class="form-control" id="question_text" name="question_text" rows="4" required
+                                          style="height: 140px">{{ form_data.question_text|default_if_none:'' }}</textarea>
+                                <label for="question_text"><i class="bi bi-question-circle"></i>Question Text</label>
+                                {% if errors.question_text %}
+                                    <div class="invalid-feedback d-block">{{ errors.question_text|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Difficulty -->
+                        <div class="mb-5">
+                            <div class="form-floating">
+                                <select class="form-select" id="difficulty" name="difficulty" required>
+                                    <option value="" disabled selected>Select Difficulty</option>
+                                    <option value="E" {% if form_data.difficulty == 'E' %}selected{% endif %}>Easy</option>
+                                    <option value="M" {% if form_data.difficulty == 'M' %}selected{% endif %}>Medium</option>
+                                    <option value="H" {% if form_data.difficulty == 'H' %}selected{% endif %}>Hard</option>
+                                </select>
+                                <label for="difficulty"><i class="bi bi-bar-chart"></i>Difficulty</label>
+                                {% if errors.difficulty %}
+                                    <div class="invalid-feedback d-block">{{ errors.difficulty|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Options -->
+                        <div class="mb-5">
+                            <label class="form-label fw-bold"><i class="bi bi-list-check me-2"></i>Options</label>
+                            {% for key in 'ABCD' %}
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text">{{ key }}</span>
+                                    <input type="text" class="form-control" id="option_{{ key }}" name="options.{{ key }}"
+                                           value="{{ form_data.options|get_item:key|default_if_none:'' }}" required>
+                                    {% if errors.options and forloop.first %}
+                                        <div class="invalid-feedback d-block">{{ errors.options|join:", " }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Correct Answer -->
+                        <div class="mb-5">
+                            <div class="form-floating">
+                                <select class="form-select" id="correct_answer" name="correct_answer" required>
+                                    <option value="" disabled selected>Select Correct Answer</option>
+                                    {% for key in 'ABCD' %}
+                                        <option value="{{ key }}" {% if form_data.correct_answer == key %}selected{% endif %}>{{ key }}</option>
+                                    {% endfor %}
+                                </select>
+                                <label for="correct_answer"><i class="bi bi-check-circle"></i>Correct Answer</label>
+                                {% if errors.correct_answer %}
+                                    <div class="invalid-feedback d-block">{{ errors.correct_answer|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Metadata -->
+                        <div class="mb-5">
+                            <div class="form-floating">
+                                <textarea class="form-control" id="metadata" name="metadata" rows="3"
+                                          placeholder='{"source": "textbook", "reference": "Chapter 3"}'
+                                          style="height: 120px">{{ form_data.metadata|default_if_none:'' }}</textarea>
+                                <label for="metadata"><i class="bi bi-info-circle"></i>Metadata (Optional JSON)</label>
+                                {% if errors.metadata %}
+                                    <div class="invalid-feedback d-block">{{ errors.metadata|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">Enter JSON (e.g., {"source": "textbook"}) or leave empty.</small>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="text-center mt-5">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-2"></i>Create Question
+                            </button>
+                            <a href="{% url 'question_list' %}" class="btn btn-outline-secondary ms-2">
+                                <i class="bi bi-x-circle me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+<script>
+    // Initialize AOS
+    AOS.init({
+        duration: 800,
+        once: true
+    });
+
+    // Initialize Select2 for topics
+    $(document).ready(function() {
+        $('#topics').select2({
+            placeholder: 'Select topics',
+            allowClear: true,
+            width: '100%',
+            templateResult: function(data) {
+                if (!data.element) return data.text;
+                return $('<span>' + data.text + '</span>');
+            }
+        });
+    });
+
+    // Filter topics based on subject
+    function filterTopics() {
+        const subjectSelect = document.getElementById('subject');
+        const topicSelect = document.getElementById('topics');
+        const selectedSubject = subjectSelect.value;
+        const $topicSelect = $('#topics');
+        
+        // Clear selections if subject changes
+        if (selectedSubject) {
+            $topicSelect.val(null).trigger('change');
+        }
+        
+        // Filter options
+        topicSelect.querySelectorAll('option').forEach(option => {
+            const subjectId = option.getAttribute('data-subject');
+            option.disabled = selectedSubject && subjectId !== selectedSubject;
+            option.style.display = selectedSubject && subjectId !== selectedSubject ? 'none' : '';
+        });
+        
+        // Refresh Select2
+        $topicSelect.trigger('change');
+    }
+
+    // Ensure topics are filtered on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        filterTopics();
+    });
+
+    // Client-side validation for unique options
+    document.getElementById('question-form').addEventListener('submit', (e) => {
+        const options = ['A', 'B', 'C', 'D'].map(key => document.getElementById(`option_${key}`).value.trim());
+        const uniqueOptions = new Set(options);
+        if (uniqueOptions.size < options.length) {
+            e.preventDefault();
+            alert('All options must be unique.');
+        }
+    });
+
+    // Loading state for submit button
+    document.getElementById('question-form').addEventListener('submit', (e) => {
+        const button = e.target.querySelector('button[type="submit"]');
+        button.disabled = true;
+        button.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Creating...';
+    });
+</script>
+{% endblock %}
+
+{% comment %} {% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Create Question - MCQ Master{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1 class="text-center mb-4" data-aos="fade-up">Create Question</h1>
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="post" action="{% url 'question_create' %}">
+            {% csrf_token %}
+            <input type="hidden" name="question_type" value="MCQ">
+            <div class="mb-3">
+              <label for="subject" class="form-label">Subject</label>
+              <select class="form-select" id="subject" onchange="filterTopics()">
+                <option value="" selected>Select Subject</option>
+                {% for subject in subjects %}
+                  <option value="{{ subject.id }}">{{ subject.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="topics" class="form-label">Topics</label>
+              <select class="form-select" id="topics" name="topics" multiple required>
+                {% for topic in topics %}
+                  <option value="{{ topic.id }}" {% if topic.id in form_data.topics %}selected{% endif %}>
+                    {{ topic.subject.name }} - {{ topic.name }}
+                  </option>
+                {% endfor %}
+              </select>
+              {% if errors.topics %}
+                <div class="text-danger small">{{ errors.topics.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label for="question_text" class="form-label">Question Text</label>
+              <textarea class="form-control" id="question_text" name="question_text" rows="4" required>{{ form_data.question_text|default:'' }}</textarea>
+              {% if errors.question_text %}
+                <div class="text-danger small">{{ errors.question_text.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label for="difficulty" class="form-label">Difficulty</label>
+              <select class="form-select" id="difficulty" name="difficulty" required>
+                <option value="" disabled selected>Select Difficulty</option>
+                <option value="E" {% if form_data.difficulty == 'E' %}selected{% endif %}>Easy</option>
+                <option value="M" {% if form_data.difficulty == 'M' %}selected{% endif %}>Medium</option>
+                <option value="H" {% if form_data.difficulty == 'H' %}selected{% endif %}>Hard</option>
+              </select>
+              {% if errors.difficulty %}
+                <div class="text-danger small">{{ errors.difficulty.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Options</label>
+              {% for key in 'ABCD' %}
+                <div class="input-group mb-2">
+                  <span class="input-group-text">{{ key }}</span>
+                  <input type="text" class="form-control" name="options.{{ key }}" value="{{ form_data.options|default:'' }}" required>
+                </div>
+                {% if errors.options %}
+                  <div class="text-danger small">{{ errors.options.0 }}</div>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <div class="mb-3">
+              <label for="correct_answer" class="form-label">Correct Answer</label>
+              <select class="form-select" id="correct_answer" name="correct_answer" required>
+                <option value="" disabled selected>Select Correct Answer</option>
+                {% for key in 'ABCD' %}
+                  <option value="{{ key }}" {% if form_data.correct_answer == key %}selected{% endif %}>{{ key }}</option>
+                {% endfor %}
+              </select>
+              {% if errors.correct_answer %}
+                <div class="text-danger small">{{ errors.correct_answer.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label for="metadata" class="form-label">Metadata (Optional JSON)</label>
+              <textarea class="form-control" id="metadata" name="metadata" rows="3">{{ form_data.metadata|default:'' }}</textarea>
+              {% if errors.metadata %}
+                <div class="text-danger small">{{ errors.metadata.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="text-center">
+              <button type="submit" class="btn btn-primary">Create Question</button>
+              <a href="{% url 'question_list' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+  function filterTopics() {
+    const subjectSelect = document.getElementById('subject');
+    const topicSelect = document.getElementById('topics');
+    const selectedSubject = subjectSelect.value;
+    const options = topicSelect.options;
+
+    for (let i = 0; i < options.length; i++) {
+      const topicSubject = options[i].text.split(' - ')[0];
+      options[i].style.display = selectedSubject === '' || topicSubject === subjectSelect.options[subjectSelect.selectedIndex].text ? '' : 'none';
+    }
+  }
+</script>
+{% endblock %}
+{% endblock %} {% endcomment %}

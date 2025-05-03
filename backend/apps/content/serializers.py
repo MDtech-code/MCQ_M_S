@@ -30,10 +30,10 @@ class QuestionSerializer(serializers.ModelSerializer):
         model = Question
         fields = [
             'id', 'question_text', 'question_type', 'difficulty', 'topics',
-            'options', 'correct_answer', 'metadata', 'version', 'is_active',
+            'options', 'correct_answer', 'metadata', 'version', 'is_active','source',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'version', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'version', 'is_active','source', 'created_at', 'updated_at']
     def validate(self, data):
         # Basic validations
         if not data.get('topics'):

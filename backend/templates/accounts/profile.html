@@ -1,0 +1,729 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}
+  {% if is_update %}Update Profile{% else %}My Profile{% endif %} - MCQ Master
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+      <div class="card shadow-lg border-0">
+        <!-- Card Header -->
+        <div class="card-header bg-primary text-white py-4">
+          <div class="d-flex align-items-center justify-content-between">
+            <h3 class="mb-0">
+              <i class="bi bi-person-badge me-2"></i>
+              {% if is_update %}Update Profile{% else %}My Profile{% endif %}
+            </h3>
+            {% comment %} {% if not is_update %}
+              <a href="{% url 'profile_update' %}" class="btn btn-outline-light">
+                <i class="bi bi-pencil-square me-2"></i>Edit Profile
+              </a>
+            {% endif %} {% endcomment %}
+            {% if not is_update %}
+              {% if user.role == 'TE' and not user.is_approved or not user.is_verified %}
+                <button class="btn btn-outline-light" onclick="showRestrictedModal()">
+                  <i class="bi bi-pencil-square me-2"></i>Edit Profile
+                </button>
+              {% else %}
+                <a href="{% url 'profile_update' %}" class="btn btn-outline-light">
+                  <i class="bi bi-pencil-square me-2"></i>Edit Profile
+                </a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Card Body -->
+        <div class="card-body p-4">
+          
+          {% if is_update %}
+                <!-- Edit Mode -->
+                <form method="post" action="{% url 'profile_update' %}" enctype="multipart/form-data" id="profile-update-form" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    <div class="text-center mb-4">
+                        <div class="avatar-upload position-relative d-inline-block">
+                            <img src="{% if profile.avatar %}{{ profile.avatar.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" 
+                                 class="rounded-circle shadow" 
+                                 style="width: 150px; height: 150px; object-fit: cover;"
+                                 id="avatarPreview">
+                            <label class="btn btn-sm btn-secondary position-absolute bottom-0 end-0 rounded-circle shadow-sm">
+                                <i class="bi bi-camera"></i>
+                                <input type="file" id="avatar" name="avatar" accept="image/*" hidden>
+                            </label>
+                            {% if errors.avatar %}
+                                <div class="invalid-feedback d-block mt-2">
+                                    {{ errors.avatar|join:", " }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-4">
+                        <!-- Personal Information -->
+                         <div class="col-md-6">
+    <div class="mb-3">
+        <div class="form-floating">
+            <input type="text" class="form-control" id="id_first_name" name="first_name" 
+                   value="{{ form_data.first_name|default:user.first_name|default_if_none:'' }}">
+            <label for="id_first_name"><i class="bi bi-person me-2"></i>First Name</label>
+            {% if errors.first_name %}
+                <div class="invalid-feedback d-block">
+                    {{ errors.first_name|join:", " }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<div class="col-md-6">
+    <div class="mb-3">
+        <div class="form-floating">
+            <input type="text" class="form-control" id="id_last_name" name="last_name" 
+                   value="{{ form_data.last_name|default:user.last_name|default_if_none:'' }}">
+            <label for="id_last_name"><i class="bi bi-person me-2"></i>Last Name</label>
+            {% if errors.last_name %}
+                <div class="invalid-feedback d-block">
+                    {{ errors.last_name|join:", " }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-floating">
+                                    <input type="tel" class="form-control" id="id_phone_number" 
+                                           name="phone_number" placeholder="Phone Number"
+                                           value="{{ form_data.phone_number|default:profile.phone_number|default_if_none:'' }}">
+                                    <label for="id_phone_number"><i class="bi bi-phone me-2"></i>Phone Numbers</label>
+                                    {% if errors.phone_number %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ errors.phone_number|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-floating">
+                                    <input type="date" class="form-control" id="id_date_of_birth" 
+                                           name="date_of_birth" placeholder="Date of Birth"
+                                           value="{{ form_data.date_of_birth|default:profile.date_of_birth|date:'Y-m-d'|default_if_none:'' }}">
+                                    <label for="id_date_of_birth"><i class="bi bi-calendar me-2"></i>Date of Birth</label>
+                                    {% if errors.date_of_birth %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ errors.date_of_birth|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <div class="form-floating">
+                                    <select class="form-select" id="id_gender" name="gender">
+                                        <option value="">Select Gender</option>
+                                        <option value="MA" {% if form_data.gender|default:profile.gender == 'MA' %}selected{% endif %}>Male</option>
+                                        <option value="FE" {% if form_data.gender|default:profile.gender == 'FE' %}selected{% endif %}>Female</option>
+                                        <option value="UD" {% if form_data.gender|default:profile.gender == 'UD' %}selected{% endif %}>Other</option>
+                                    </select>
+                                    <label for="id_gender"><i class="bi bi-gender-ambiguous me-2"></i>Gender</label>
+                                    {% if errors.gender %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ errors.gender|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Role-Specific Fields -->
+                        {% if user.role == 'ST' %}
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="id_grade_level" 
+                                               name="grade_level" placeholder="Grade Level" required
+                                               value="{{ form_data.grade_level|default:profile.grade_level|default_if_none:'' }}">
+                                        <label for="id_grade_level"><i class="bi bi-mortarboard me-2"></i>Grade Level</label>
+                                        {% if errors.grade_level %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ errors.grade_level|join:", " }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-floating">
+                                        <input type="email" class="form-control" id="id_parent_email" 
+                                               name="parent_email" placeholder="Parent Email"
+                                               value="{{ form_data.parent_email|default:profile.parent_email|default_if_none:'' }}">
+                                        <label for="id_parent_email"><i class="bi bi-person-vcard me-2"></i>Parent Email</label>
+                                        {% if errors.parent_email %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ errors.parent_email|join:", " }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="id_department" 
+                                               name="department" placeholder="Department" required
+                                               value="{{ form_data.department|default:profile.department|default_if_none:'' }}">
+                                        <label for="id_department"><i class="bi bi-building me-2"></i>Department</label>
+                                        {% if errors.department %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ errors.department|join:", " }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="id_office_number" 
+                                               name="office_number" placeholder="Office Number"
+                                               value="{{ form_data.office_number|default:profile.office_number|default_if_none:'' }}">
+                                        <label for="id_office_number"><i class="bi bi-door-open me-2"></i>Office Number</label>
+                                        {% if errors.office_number %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ errors.office_number|join:", " }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <div class="form-floating">
+                                        <textarea class="form-control" id="id_qualifications" 
+                                                  name="qualifications" placeholder="Qualifications"
+                                                  style="height: 120px">{{ form_data.qualifications|default:profile.qualifications|default_if_none:'' }}</textarea>
+                                        <label for="id_qualifications"><i class="bi bi-award me-2"></i>Qualifications</label>
+                                        {% if errors.qualifications %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ errors.qualifications|join:", " }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Form Actions -->
+                        <div class="col-12 mt-4">
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="submit" class="btn btn-primary btn-lg px-4">
+                                    <i class="bi bi-save me-2"></i>Save Changes
+                                </button>
+                                <a href="{% url 'profile' %}" class="btn btn-outline-secondary btn-lg px-4">
+                                    <i class="bi bi-x-circle me-2"></i>Cancel
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+ 
+
+            <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const avatarInput = document.getElementById('avatar');
+                        const avatarPreview = document.getElementById('avatarPreview');
+
+                        avatarInput.addEventListener('change', () => {
+                            const file = avatarInput.files[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    avatarPreview.src = e.target.result;
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        });
+                    });
+                </script>
+          {% else %}
+            <!-- View Mode -->
+            <div class="text-center mb-5">
+              <div class="avatar-preview position-relative d-inline-block">
+                <img src="{% if profile.avatar %}{{ profile.avatar.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" 
+                     class="rounded-circle shadow" 
+                     style="width: 150px; height: 150px; object-fit: cover;">
+                {% if not user.is_verified %}
+                  <span class="badge bg-warning position-absolute top-0 start-100 translate-middle">
+                    <i class="bi bi-exclamation-triangle me-1"></i>Unverified
+                  </span>
+                {% endif %}
+              </div>
+              <h2 class="mt-4">{{ user.get_full_name|default:user.username }}</h2>
+              <p class="text-muted mb-0">
+  {{ user.email }}
+  {% if user.is_verified %}
+    <i class="bi bi-check-circle-fill text-success" title="Email Verified"></i>
+  {% else %}
+    <i class="bi bi-x-circle-fill text-danger" title="Email Not Verified"></i>
+  {% endif %}
+</p>
+              {% comment %} <p class="text-muted mb-0">{{ user.email }}</p> {% endcomment %}
+              <div class="mt-3">
+                <a href="{% url 'update_email' %}" class="btn btn-outline-primary btn-sm me-2">
+                  <i class="bi bi-envelope me-1"></i>Update Email
+                </a>
+                <a href="{% url 'change_password' %}" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-shield-lock me-1"></i>Change Password
+                </a>
+              </div>
+            </div>
+
+            <!-- Profile Details -->
+            <div class="row g-4">
+              <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                  <div class="card-body">
+                    <h5 class="card-title text-primary mb-4">
+                      <i class="bi bi-info-circle me-2"></i>Personal Information
+                    </h5>
+                    <dl class="row">
+                      <dt class="col-sm-5">Phone Number</dt>
+                      <dd class="col-sm-7">{{ profile.phone_number|default:"Not provided" }}</dd>
+
+                      <dt class="col-sm-5">Date of Birth</dt>
+                      <dd class="col-sm-7">{{ profile.date_of_birth|date:"F j, Y"|default:"Not provided" }}</dd>
+
+                      <dt class="col-sm-5">Gender</dt>
+                      <dd class="col-sm-7">
+                        {% if profile.gender == 'MA' %}Male
+                        {% elif profile.gender == 'FE' %}Female
+                        {% elif profile.gender == 'UD' %}Other
+                        {% else %}Not specified
+                        {% endif %}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                  <div class="card-body">
+                    <h5 class="card-title text-primary mb-4">
+                      <i class="bi bi-person-workspace me-2"></i>
+                      {% if user.role == 'ST' %}Academic Information{% else %}Professional Information{% endif %}
+                    </h5>
+                    <dl class="row">
+                      {% if user.role == 'ST' %}
+                        <dt class="col-sm-5">Grade Level</dt>
+                        <dd class="col-sm-7">{{ profile.grade_level|default:"Not provided" }}</dd>
+
+                        <dt class="col-sm-5">Parent Email</dt>
+                        <dd class="col-sm-7">{{ profile.parent_email|default:"Not provided" }}</dd>
+                      {% else %}
+                        <dt class="col-sm-5">Department</dt>
+                        <dd class="col-sm-7">{{ profile.department|default:"Not provided" }}</dd>
+
+                        <dt class="col-sm-5">Office Number</dt>
+                        <dd class="col-sm-7">{{ profile.office_number|default:"Not provided" }}</dd>
+
+                        <dt class="col-sm-5">Qualifications</dt>
+                        <dd class="col-sm-7">{{ profile.qualifications|default:"Not provided"|linebreaksbr }}</dd>
+                      {% endif %}
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Restricted Access Modal -->
+
+{% include "base/restricted_modal.html" %}
+{% block extra_js %}
+{% if is_update %}
+<script>
+  // Avatar Preview
+  document.getElementById('avatar').addEventListener('change', function(e) {
+    const [file] = e.target.files
+    if (file) {
+      document.getElementById('avatarPreview').src = URL.createObjectURL(file)
+    }
+  })
+
+  // Form Validation
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.needs-validation')
+    
+    form.addEventListener('submit', function(event) {
+      if (!form.checkValidity()) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+      
+      form.classList.add('was-validated')
+    }, false)
+  })
+</script>
+{% else %}
+<script>
+    function showRestrictedModal() {
+      const modal = new bootstrap.Modal(document.getElementById('restrictedModal'));
+      modal.show();
+    }
+  </script>
+{% endif %}
+{% endblock %}
+
+{% endblock %}
+{% comment %} 
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}
+  {% if is_update %}Update Profile{% else %}My Profile{% endif %} - MCQ Master
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1 class="text-center mb-4" >
+    {% if is_update %}Update Profile{% else %}My Profile{% endif %}
+  </h1>
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      <div class="card shadow-sm">
+        <div class="card-body">
+          {% if is_update %}
+            <form method="post" action="{% url 'profile_update' %}" enctype="multipart/form-data" id="profile-form">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label for="phone_number" class="form-label">Phone Number</label>
+                <input type="tel" class="form-control" id="phone_number" name="phone_number" value="{{ form_data.phone_number|default:profile.phone_number|default_if_none:'' }}">
+                {% if errors.phone_number %}
+                  <div class="text-danger small">{{ errors.phone_number.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="mb-3">
+                <label for="date_of_birth" class="form-label">Date of Birth</label>
+                <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ form_data.date_of_birth|default:profile.date_of_birth|date:'Y-m-d'|default_if_none:'' }}">
+                {% if errors.date_of_birth %}
+                  <div class="text-danger small">{{ errors.date_of_birth.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="mb-3">
+                <label for="gender" class="form-label">Gender</label>
+                <select class="form-select" id="gender" name="gender">
+                  <option value="">Select Gender</option>
+                  <option value="MA" {% if form_data.gender|default:profile.gender == 'MA' %}selected{% endif %}>Male</option>
+                  <option value="FE" {% if form_data.gender|default:profile.gender == 'FE' %}selected{% endif %}>Female</option>
+                  <option value="UD" {% if form_data.gender|default:profile.gender == 'UD' %}selected{% endif %}>Other</option>
+                </select>
+                {% if errors.gender %}
+                  <div class="text-danger small">{{ errors.gender.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="mb-3">
+                <label for="avatar" class="form-label">Profile Picture</label>
+                <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
+                {% if profile.avatar %}
+                  <img src="{{ profile.avatar.url }}" alt="Avatar" class="img-thumbnail mt-2" style="max-width: 100px;">
+                {% endif %}
+                {% if errors.avatar %}
+                  <div class="text-danger small">{{ errors.avatar.0 }}</div>
+                {% endif %}
+              </div>
+              {% if user.role == 'ST' %}
+                <div class="mb-3">
+                  <label for="grade_level" class="form-label">Grade Level</label>
+                  <input type="text" class="form-control" id="grade_level" name="grade_level" value="{{ form_data.grade_level|default:profile.grade_level|default_if_none:'' }}">
+                  {% if errors.grade_level %}
+                    <div class="text-danger small">{{ errors.grade_level.0 }}</div>
+                  {% endif %}
+                </div>
+                <div class="mb-3">
+                  <label for="parent_email" class="form-label">Parent Email</label>
+                  <input type="email" class="form-control" id="parent_email" name="parent_email" value="{{ form_data.parent_email|default:profile.parent_email|default_if_none:'' }}">
+                  {% if errors.parent_email %}
+                    <div class="text-danger small">{{ errors.parent_email.0 }}</div>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="mb-3">
+                  <label for="department" class="form-label">Department</label>
+                  <input type="text" class="form-control" id="department" name="department" value="{{ form_data.department|default:profile.department|default_if_none:'' }}">
+                  {% if errors.department %}
+                    <div class="text-danger small">{{ errors.department.0 }}</div>
+                  {% endif %}
+                </div>
+                <div class="mb-3">
+                  <label for="office_number" class="form-label">Office Number</label>
+                  <input type="text" class="form-control" id="office_number" name="office_number" value="{{ form_data.office_number|default:profile.office_number|default_if_none:'' }}">
+                  {% if errors.office_number %}
+                    <div class="text-danger small">{{ errors.office_number.0 }}</div>
+                  {% endif %}
+                </div>
+                <div class="mb-3">
+                  <label for="qualifications" class="form-label">Qualifications</label>
+                  <textarea class="form-control" id="qualifications" name="qualifications">{{ form_data.qualifications|default:profile.qualifications|default_if_none:'' }}</textarea>
+                  {% if errors.qualifications %}
+                    <div class="text-danger small">{{ errors.qualifications.0 }}</div>
+                  {% endif %}
+                </div>
+              {% endif %}
+              <div class="text-center">
+                <button type="submit" class="btn btn-primary">Update Profile</button>
+                <a href="{% url 'profile_update' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+              </div>
+            </form>
+          {% else %}
+            <div class="text-center mb-4">
+              {% if profile.avatar %}
+                <img src="{{ profile.avatar.url }}" alt="Profile Picture" class="rounded-circle shadow" style="width: 150px; height: 150px; object-fit: cover;">
+              {% else %}
+                <img src="{% static 'images/default-avatar.png' %}" alt="Default Avatar" class="rounded-circle shadow" style="width: 150px; height: 150px;">
+              {% endif %}
+              <h3 class="mt-3">{{ user.get_full_name|default:user.email }}</h3>
+              <p class="text-muted">
+                {{ user.email }}
+                {% if not user.is_verified %}
+                  <span class="text-warning" title="Email not verified">
+                    <i class="bi bi-envelope-exclamation-fill"></i>
+                  </span>
+                {% endif %}
+              </p>
+              <a href="{% url 'profile_update' %}" class="btn btn-outline-primary">Edit Profile</a>
+            </div>
+            <dl class="row">
+              <dt class="col-sm-4">Phone Number</dt>
+              <dd class="col-sm-8">{{ profile.phone_number|default:"Not set" }}</dd>
+              <dt class="col-sm-4">Date of Birth</dt>
+              <dd class="col-sm-8">{{ profile.date_of_birth|date:"Y-m-d"|default:"Not set" }}</dd>
+              <dt class="col-sm-4">Gender</dt>
+              <dd class="col-sm-8">
+                {% if profile.gender == 'MA' %}Male
+                {% elif profile.gender == 'FE' %}Female
+                {% elif profile.gender == 'UD' %}Other
+                {% else %}Not set
+                {% endif %}
+              </dd>
+              {% if user.role == 'ST' %}
+                <dt class="col-sm-4">Grade Level</dt>
+                <dd class="col-sm-8">{{ profile.grade_level|default:"Not set" }}</dd>
+                <dt class="col-sm-4">Parent Email</dt>
+                <dd class="col-sm-8">{{ profile.parent_email|default:"Not set" }}</dd>
+              {% else %}
+                <dt class="col-sm-4">Department</dt>
+                <dd class="col-sm-8">{{ profile.department|default:"Not set" }}</dd>
+                <dt class="col-sm-4">Office Number</dt>
+                <dd class="col-sm-8">{{ profile.office_number|default:"Not set" }}</dd>
+                <dt class="col-sm-4">Qualifications</dt>
+                <dd class="col-sm-8">{{ profile.qualifications|default:"Not set" }}</dd>
+              {% endif %}
+            </dl>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+{% if is_update %}
+<script>
+  console.log("Gender before submit:", document.getElementById('gender').value);
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('profile-form');
+    form.addEventListener('submit', function(event) {
+      const phone = document.getElementById('phone_number').value;
+      const parentEmail = document.getElementById('parent_email');
+      if (phone && !/^\+?\d{10,15}$/.test(phone)) {
+        event.preventDefault();
+        alert('Please enter a valid phone number (10-15 digits).');
+      }
+      if (parentEmail && parentEmail.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail.value)) {
+        event.preventDefault();
+        alert('Please enter a valid parent email.');
+      }
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}
+{% endblock %} {% endcomment %}
+
+         {% comment %} {% if is_update %}
+            <!-- Edit Mode -->
+            <form method="post" action="{% url 'profile_update' %}" enctype="multipart/form-data" id='profile-update-form' class="needs-validation" novalidate>
+              {% csrf_token %}
+              <div class="text-center mb-3">
+                <div class="avatar-upload position-relative d-inline-block">
+                  <img src="{% if profile.avatar %}{{ profile.avatar.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" 
+                       class="rounded-circle shadow" 
+                       style="width: 150px; height: 150px; object-fit: cover;"
+                       id="avatarPreview">
+                  <label class="btn btn-sm btn-secondary position-absolute bottom-0 end-0 rounded-circle shadow-sm">
+                    <i class="bi bi-camera"></i>
+                    <input type="file" id="avatar" name="avatar" accept="image/*" hidden>
+                  </label>
+                </div>
+              </div>
+
+              <div class="row g-4">
+                <!-- Personal Information -->
+                <div class="col-md-6">
+                  <div class="form-floating">
+                    <input type="tel" class="form-control" id="phone_number" 
+                           name="phone_number" placeholder="Phone Number"
+                           value="{{ form_data.phone_number|default:profile.phone_number|default_if_none:'' }}">
+                    <label for="phone_number"><i class="bi bi-phone me-2"></i>Phone Number</label>
+                    {% if errors.phone_number %}
+                      <div class="invalid-feedback d-block">
+                        {{ errors.phone_number.0 }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <div class="form-floating">
+                    <input type="date" class="form-control" id="date_of_birth" 
+                           name="date_of_birth" placeholder="Date of Birth"
+                           value="{{ form_data.date_of_birth|default:profile.date_of_birth|date:'Y-m-d'|default_if_none:'' }}">
+                    <label for="date_of_birth"><i class="bi bi-calendar me-2"></i>Date of Birth</label>
+                    {% if errors.date_of_birth %}
+                      <div class="invalid-feedback d-block">
+                        {{ errors.date_of_birth.0 }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="form-floating">
+                    <select class="form-select" id="gender" name="gender">
+                      <option value="">Select Gender</option>
+                      <option value="MA" {% if form_data.gender|default:profile.gender == 'MA' %}selected{% endif %}>Male</option>
+                      <option value="FE" {% if form_data.gender|default:profile.gender == 'FE' %}selected{% endif %}>Female</option>
+                      <option value="UD" {% if form_data.gender|default:profile.gender == 'UD' %}selected{% endif %}>Other</option>
+                    </select>
+                    <label for="gender"><i class="bi bi-gender-ambiguous me-2"></i>Gender</label>
+                    {% if errors.gender %}
+                      <div class="invalid-feedback d-block">
+                        {{ errors.gender.0 }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Role-Specific Fields -->
+                {% if user.role == 'ST' %}
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input type="text" class="form-control" id="grade_level" 
+                             name="grade_level" placeholder="Grade Level"
+                             value="{{ form_data.grade_level|default:profile.grade_level|default_if_none:'' }}">
+                      <label for="grade_level"><i class="bi bi-mortarboard me-2"></i>Grade Level</label>
+                      {% if errors.grade_level %}
+                        <div class="invalid-feedback d-block">
+                          {{ errors.grade_level.0 }}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input type="email" class="form-control" id="parent_email" 
+                             name="parent_email" placeholder="Parent Email"
+                             value="{{ form_data.parent_email|default:profile.parent_email|default_if_none:'' }}">
+                      <label for="parent_email"><i class="bi bi-person-vcard me-2"></i>Parent Email</label>
+                      {% if errors.parent_email %}
+                        <div class="invalid-feedback d-block">
+                          {{ errors.parent_email.0 }}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input type="text" class="form-control" id="department" 
+                             name="department" placeholder="Department"
+                             value="{{ form_data.department|default:profile.department|default_if_none:'' }}">
+                      <label for="department"><i class="bi bi-building me-2"></i>Department</label>
+                      {% if errors.department %}
+                        <div class="invalid-feedback d-block">
+                          {{ errors.department.0 }}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input type="text" class="form-control" id="office_number" 
+                             name="office_number" placeholder="Office Number"
+                             value="{{ form_data.office_number|default:profile.office_number|default_if_none:'' }}">
+                      <label for="office_number"><i class="bi bi-door-open me-2"></i>Office Number</label>
+                      {% if errors.office_number %}
+                        <div class="invalid-feedback d-block">
+                          {{ errors.office_number.0 }}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <div class="form-floating">
+                      <textarea class="form-control" id="qualifications" 
+                                name="qualifications" placeholder="Qualifications"
+                                style="height: 120px">{{ form_data.qualifications|default:profile.qualifications|default_if_none:'' }}</textarea>
+                      <label for="qualifications"><i class="bi bi-award me-2"></i>Qualifications</label>
+                      {% if errors.qualifications %}
+                        <div class="invalid-feedback d-block">
+                          {{ errors.qualifications.0 }}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+
+                <!-- Form Actions -->
+                <div class="col-12 mt-4">
+                  <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="submit" class="btn btn-primary btn-lg px-4">
+                      <i class="bi bi-save me-2"></i>Save Changes
+                    </button>
+                    <a href="{% url 'profile' %}" class="btn btn-outline-secondary btn-lg px-4">
+                      <i class="bi bi-x-circle me-2"></i>Cancel
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </form> {% endcomment %}

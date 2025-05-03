@@ -86,7 +86,10 @@ class TestSerializer(serializers.ModelSerializer):
                     logger.warning(f"Test creation failed: Question {q.id} does not belong to test subjects")
                     raise serializers.ValidationError({"questions": f"Question {q.id} does not belong to test subjects"})
 
-        if not isinstance(scoring_scheme, dict) or 'correct' not in scoring_scheme or 'incorrect' in scoring_scheme:
+        # if not isinstance(scoring_scheme, dict) or 'correct' not in scoring_scheme or 'incorrect' in scoring_scheme:
+        #     logger.warning("Test creation failed: Invalid scoring scheme")
+        #     raise serializers.ValidationError({"scoring_scheme": "Must include 'correct' and 'incorrect' values"})
+        if not isinstance(scoring_scheme, dict) or 'correct' not in scoring_scheme or 'incorrect' not in scoring_scheme:
             logger.warning("Test creation failed: Invalid scoring scheme")
             raise serializers.ValidationError({"scoring_scheme": "Must include 'correct' and 'incorrect' values"})
 
@@ -99,7 +102,7 @@ class TestSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         subjects = validated_data.pop('subjects', [])
         questions = validated_data.pop('questions', [])
-        test = Test.objects.create(**validated_data, created_by=self.context['request'].user)
+        test = Test.objects.create(**validated_data)
         test.subjects.set(subjects)
         test.questions.set(questions)
         logger.info(f"Test {test.id} created by {test.created_by.email}")
@@ -145,7 +148,42 @@ class TestAttemptSerializer(serializers.ModelSerializer):
         validated_data['start_time'] = timezone.now()
         return super().create(validated_data)
 
+# class StudentResponseSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = StudentResponse
+#         fields = ['id', 'attempt', 'question', 'selected_answer', 'is_correct', 'time_taken']
+#         read_only_fields = ['is_correct']
+
+#     def validate(self, data):
+#         attempt = data['attempt']
+#         question = data['question']
+#         if attempt.student != self.context['request'].user:
+#             raise serializers.ValidationError("You can only respond to your own attempts.")
+#         if question not in attempt.test.questions.all():
+#             raise serializers.ValidationError("Question does not belong to this test.")
+#         if data['selected_answer'] not in question.options:
+#             raise serializers.ValidationError("Invalid answer option.")
+#         if attempt.end_time:
+#             raise serializers.ValidationError("Attempt is already submitted.")
+#         if timezone.now() > attempt.start_time + timedelta(minutes=attempt.test.duration):
+#             raise serializers.ValidationError("Test duration has expired.")
+#         return data
+
+
+# apps.examination.serializers.py
+
+from rest_framework import serializers
+from django.utils import timezone
+from datetime import timedelta
+
+from .models import StudentResponse, TestAttempt
+from apps.content.models import Question
+
 class StudentResponseSerializer(serializers.ModelSerializer):
+    # Declare attempt & question as PK fields, so DRF can resolve them from integers
+    attempt = serializers.PrimaryKeyRelatedField(queryset=TestAttempt.objects.all())
+    question = serializers.PrimaryKeyRelatedField(queryset=Question.objects.all())
+
     class Meta:
         model = StudentResponse
         fields = ['id', 'attempt', 'question', 'selected_answer', 'is_correct', 'time_taken']
@@ -154,7 +192,9 @@ class StudentResponseSerializer(serializers.ModelSerializer):
     def validate(self, data):
         attempt = data['attempt']
         question = data['question']
-        if attempt.student != self.context['request'].user:
+        user = self.context['request'].user
+
+        if attempt.student != user:
             raise serializers.ValidationError("You can only respond to your own attempts.")
         if question not in attempt.test.questions.all():
             raise serializers.ValidationError("Question does not belong to this test.")
@@ -165,6 +205,13 @@ class StudentResponseSerializer(serializers.ModelSerializer):
         if timezone.now() > attempt.start_time + timedelta(minutes=attempt.test.duration):
             raise serializers.ValidationError("Test duration has expired.")
         return data
+
+    def create(self, validated_data):
+        # Determine correctness
+        question = validated_data['question']
+        validated_data['is_correct'] = (validated_data['selected_answer'] == question.correct_answer)
+        return super().create(validated_data)
+
 # # apps/examination/serializers.py
 # from rest_framework import serializers
 # from .models import Test, TestAttempt, StudentResponse

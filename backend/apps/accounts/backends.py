@@ -20,6 +20,6 @@ class EmailOrUsernameBackend(ModelBackend):
             # Handle the case where multiple users have the same email
             return User.objects.filter(email__iexact=username).order_by('id').first()
 
-        if user.check_password(password):
+        if user is not None and user.check_password(password):
             return user
         return None

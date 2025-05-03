@@ -1,0 +1,76 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Account Settings - MCQ Master{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row g-4">
+        <!-- Settings Sidebar -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <nav class="nav flex-column settings-nav">
+                        <a class="nav-link {% if active_section == 'profile' %}active{% endif %}" 
+                           href="{% url 'profile'  %}">
+                            <i class="bi bi-person me-2"></i>Profile
+                        </a>
+                        <a class="nav-link {% if active_section == 'password' %}active{% endif %}" 
+                           href="{% url 'change_password' %}">
+                            <i class="bi bi-shield-lock me-2"></i>Password
+                        </a>
+                        <a class="nav-link {% if active_section == 'email' %}active{% endif %}" 
+                           href="{% url 'update_email'%}">
+                            <i class="bi bi-envelope me-2"></i>Email
+                        </a>
+                        <a class="nav-link {% if active_section == 'security' %}active{% endif %}" 
+                           href="#">
+                            <i class="bi bi-shield-exclamation me-2"></i>Security
+                        </a>
+                        <div class="dropdown-divider my-2"></div>
+                        <a class="nav-link text-danger" 
+                           href="{% url 'delete_account' %}">
+                            <i class="bi bi-trash3 me-2"></i>Delete Account
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Content -->
+        <div class="col-md-9">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="mb-4">
+                        {% block settings_title %}
+                        Account Settings
+                        {% endblock %}
+                    </h2>
+                    {% block settings_content %}
+                    <!-- Content will be injected here -->
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<style>
+.settings-nav .nav-link {
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin: 0.25rem 0;
+    transition: all 0.3s ease;
+}
+
+.settings-nav .nav-link.active {
+    background-color: #e9f2ff;
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+.settings-nav .nav-link:hover:not(.active) {
+    background-color: #f8f9fa;
+}
+</style>

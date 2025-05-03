@@ -1,0 +1,263 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block content %}
+  {% if user.is_authenticated %}
+    <!-- Authenticated users see role-specific dashboards -->
+    {% if user.role == 'ST' %}
+      {% include "home/student/student_dashboard.html" %}
+    {% elif user.role == 'TE' %}
+      {% include "home/teacher/teacher_dashboard.html" %}
+    {% endif %}
+  {% else %}
+    
+
+    {% include "partials/header.html" %}
+    <!-- Features Section -->
+    <section id="features" class="py-5 bg-light">
+      <div class="container">
+        <div class="text-center mb-5">
+          <h2 class="display-5 fw-bold mb-3" data-aos="fade-up">Why Choose MCQ Master?</h2>
+          <p class="text-muted lead" data-aos="fade-up" data-aos-delay="100">Revolutionizing exam preparation through smart technology</p>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="200">
+            <div class="card h-100 border-0 shadow-hover">
+              <div class="card-body p-4">
+                <div class="icon-wrapper bg-primary-soft mb-4">
+                  <i class="bi bi-lightning-charge text-primary fs-2"></i>
+                </div>
+                <h3 class="h4 mb-3">Adaptive Learning</h3>
+                <p class="text-muted">Smart algorithms adjust question difficulty based on your performance</p>
+                <ul class="list-unstyled text-muted">
+                  <li class="mb-2 d-flex">
+                    <i class="bi bi-check-circle text-primary me-2"></i>
+                    Personalized learning paths
+                  </li>
+                  <li class="d-flex">
+                    <i class="bi bi-check-circle text-primary me-2"></i>
+                    Performance analytics
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="300">
+            <div class="card h-100 border-0 shadow-hover">
+              <div class="card-body p-4">
+                <div class="icon-wrapper bg-primary-soft mb-4">
+                  <i class="bi bi-bar-chart-line text-primary fs-2"></i>
+                </div>
+                <h3 class="h4 mb-3">Advanced Analytics</h3>
+                <p class="text-muted">Detailed performance tracking for students and teachers</p>
+                <ul class="list-unstyled text-muted">
+                  <li class="mb-2 d-flex">
+                    <i class="bi bi-check-circle text-primary me-2"></i>
+                    Real-time progress reports
+                  </li>
+                  <li class="d-flex">
+                    <i class="bi bi-check-circle text-primary me-2"></i>
+                    Comparative analysis
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="400">
+            <div class="card h-100 border-0 shadow-hover">
+              <div class="card-body p-4">
+                <div class="icon-wrapper bg-primary-soft mb-4">
+                  <i class="bi bi-shield-check text-primary fs-2"></i>
+                </div>
+                <h3 class="h4 mb-3">Secure Platform</h3>
+                <p class="text-muted">Enterprise-grade security for all your data</p>
+                <ul class="list-unstyled text-muted">
+                  <li class="mb-2 d-flex">
+                    <i class="bi bi-check-circle text-primary me-2"></i>
+                    Encrypted communications
+                  </li>
+                  <li class="d-flex">
+                    <i class="bi bi-check-circle text-primary me-2"></i>
+                    Role-based access
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="py-5">
+      <div class="container">
+        <div class="text-center mb-5">
+          <h2 class="display-5 fw-bold mb-3" data-aos="fade-up">How It Works</h2>
+          <p class="text-muted lead" data-aos="fade-up" data-aos-delay="100">Get started in three simple steps</p>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-md-4" data-aos="zoom-in" data-aos-delay="200">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <div class="step-number bg-primary text-white">1</div>
+                <i class="bi bi-person-plus fs-1 text-primary mb-3"></i>
+                <h4 class="mb-3">Create Account</h4>
+                <p class="text-muted mb-0">Quick signup as student or teacher</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-4" data-aos="zoom-in" data-aos-delay="300">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <div class="step-number bg-primary text-white">2</div>
+                <i class="bi bi-clipboard-check fs-1 text-primary mb-3"></i>
+                <h4 class="mb-3">Start Engaging</h4>
+                <p class="text-muted mb-0">Take or create tests easily</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-4" data-aos="zoom-in" data-aos-delay="400">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <div class="step-number bg-primary text-white">3</div>
+                <i class="bi bi-graph-up-arrow fs-1 text-primary mb-3"></i>
+                <h4 class="mb-3">Track Progress</h4>
+                <p class="text-muted mb-0">Analyze and improve results</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  {% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Custom Animations */
+  .shadow-hover {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .shadow-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 1rem 2rem rgba(0,0,0,0.1) !important;
+  }
+
+  .step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: -18px auto 20px;
+    font-weight: bold;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero-section {
+    padding: 6rem 0;
+  }
+
+  .blob {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    background: rgba(41,128,185,0.1);
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: -1;
+  }
+
+  .placeholder-image {
+    width: 100%;
+    height: 400px;
+    background: #f0f4f8;
+    border-radius: 1rem;
+  }
+
+  [data-aos] {
+    visibility: hidden;
+  }
+
+  [data-aos].aos-animate {
+    visibility: visible;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Initialize AOS (Animate On Scroll)
+    AOS.init({
+      duration: 800,
+      once: true,
+      easing: 'ease-out-quad'
+    });
+
+    // Add smooth scroll behavior
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+          behavior: 'smooth'
+        });
+      });
+    });
+  });
+</script>
+{% endblock %}
+{% comment %} {% extends 'base/base.html' %}
+
+{% block content %}
+  {% if user.is_authenticated %}
+    {% if user.role == 'ST' %}
+      {% include "home/student/home.html" %}
+    {% elif user.role == 'TE' %}
+      <!-- Teacher Homepage -->
+      {% include "home/teacher/home.html" %}
+    {% endif %}
+  {% else %}
+  
+  
+    {% include "partials/header.html" %}
+    <section id="features" class="py-5">
+        <div class="container">
+            <h2 class="text-center mb-4">Why Choose MCQ Master?</h2>
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h3 class="card-title">For Students</h3>
+                            <p class="card-text">Take adaptive tests, track progress, and conquer weaknesses.</p>
+                            <a href="{% url 'signup' %}" class="btn btn-primary">Start Learning</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h3 class="card-title">For Teachers</h3>
+                            <p class="card-text">Create tests and analyze student performance.</p>
+                            <a href="{% url 'signup' %}" class="btn btn-primary">Start Teaching</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+  {% endif %}
+{% endblock %}
+
+ {% endcomment %}

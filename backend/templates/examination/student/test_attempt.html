@@ -1,0 +1,1302 @@
+{% extends 'base/base.html' %}
+{% load static form_tags %}
+
+{% block title %}Take Test - MCQ Master{% endblock %}
+
+{% block extra_css %}
+<style>
+  .test-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .test-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+  }
+  .test-card:hover {
+    transform: translateY(-5px);
+  }
+  .question-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    animation: fadeIn 0.5s ease-in;
+    display: none;
+  }
+  .question-card.active {
+    display: block;
+  }
+  .timer-progress {
+    height: 10px;
+    border-radius: 5px;
+    transition: width 1s linear;
+  }
+  .timer-warning {
+    background-color: #dc3545 !important;
+  }
+  .option-label {
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 5px;
+    transition: background 0.2s;
+  }
+  .option-label:hover {
+    background: #e9ecef;
+  }
+  .option-selected {
+    background: #d1e7dd;
+    font-weight: bold;
+  }
+  .spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  .next-btn {
+    display: none;
+  }
+  .next-btn.visible {
+    display: inline-block;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="test-container">
+  <div class="card test-card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h3 class="mb-0">{{ test.title }}</h3>
+      <div class="d-flex align-items-center">
+        <span id="test-timer" class="badge bg-primary me-2"></span>
+        <span id="test-timer-text" class="text-muted">Test Time Remaining</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="progress mb-3">
+        <div id="test-timer-progress" class="progress-bar timer-progress" role="progressbar" style="width: 100%;"></div>
+      </div>
+      <div class="progress mb-3">
+        <div id="question-timer-progress" class="progress-bar timer-progress" role="progressbar" style="width: 100%;"></div>
+      </div>
+      <div class="text-center mb-3">
+        <span id="question-timer" class="badge bg-secondary"></span>
+        <span id="question-timer-text" class="text-muted">Question Time Remaining</span>
+      </div>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% if attempt.end_time %}
+        <div class="alert alert-info text-center">
+          Test submitted. Score: {{ attempt.score|default:"N/A" }} / {{ test.questions.count }}
+        </div>
+      {% else %}
+        <form id="test-form" method="post" action="">
+          {% csrf_token %}
+          {% for question in questions %}
+            <div class="question-card" data-question-index="{{ forloop.counter0 }}">
+              <h5>{{ forloop.counter }}. {{ question.question_text }}</h5>
+              <div class="options">
+                {% for option in 'ABCD' %}
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="answer_{{ question.id }}"
+                           id="answer_{{ question.id }}_{{ option }}" value="{{ option }}"
+                           data-question-id="{{ question.id }}"
+                           {% if responses|lookup:question.id|attr:"selected_answer" == option %}checked{% endif %}>
+                    <label class="form-check-label option-label" for="answer_{{ question.id }}_{{ option }}">
+                      {{ question.options|lookup:option }}
+                    </label>
+                  </div>
+                {% endfor %}
+                <input type="hidden" name="time_taken_{{ question.id }}" id="time_taken_{{ question.id }}" value="0">
+              </div>
+              <div class="text-center mt-3">
+                <button type="button" class="btn btn-primary next-btn" data-question-id="{{ question.id }}">Next</button>
+              </div>
+            </div>
+          {% endfor %}
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="spinner-overlay" id="spinner-overlay">
+  <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not attempt.end_time %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const testDuration = {{ test.duration }} * 60; // Test duration in seconds
+    const questionDuration = 120; // 2 minutes per question
+    const startTime = new Date('{{ attempt.start_time|date:"c" }}').getTime();
+    const form = document.getElementById('test-form');
+    const testTimerElement = document.getElementById('test-timer');
+    const testTimerProgress = document.getElementById('test-timer-progress');
+    const questionTimerElement = document.getElementById('question-timer');
+    const questionTimerProgress = document.getElementById('question-timer-progress');
+    const spinnerOverlay = document.getElementById('spinner-overlay');
+    const questionCards = document.querySelectorAll('.question-card');
+    const totalQuestions = questionCards.length;
+    let currentQuestionIndex = parseInt(localStorage.getItem('test_{{ attempt.id }}_currentQuestion')) || 0;
+    let testTimeLeft = localStorage.getItem('test_{{ attempt.id }}_testTimeLeft') || calculateTestTimeLeft();
+    let questionTimeLeft = questionDuration;
+    let questionStartTimes = {};
+    let responses = JSON.parse(localStorage.getItem('test_{{ attempt.id }}_responses')) || {};
+    let questionTimerInterval = null;
+
+    // Initialize question start times
+    {% for question in questions %}
+      questionStartTimes[{{ question.id }}] = Date.now();
+    {% endfor %}
+    console.log('Initial questionStartTimes:', questionStartTimes);
+    console.log('Initial localStorage responses:', responses);
+
+    function calculateTestTimeLeft() {
+      const now = new Date().getTime();
+      const endTime = startTime + testDuration * 1000;
+      return Math.max(0, Math.floor((endTime - now) / 1000));
+    }
+
+    function showQuestion(index) {
+      questionCards.forEach((card, i) => {
+        card.classList.toggle('active', i === index);
+      });
+      const qid = questionCards[index].querySelector('input[type="radio"]').dataset.questionId;
+      questionStartTimes[qid] = Date.now();
+      const nextBtn = questionCards[index].querySelector('.next-btn');
+      const inputs = questionCards[index].querySelectorAll('input[type="radio"]');
+      nextBtn.classList.toggle('visible', Array.from(inputs).some(input => input.checked));
+      questionTimeLeft = questionDuration;
+      updateQuestionTimer();
+      startQuestionTimer();
+      localStorage.setItem('test_{{ attempt.id }}_currentQuestion', index);
+      console.log(`Showing question index ${index}, question_id=${qid}, questionStartTimes:`, questionStartTimes);
+    }
+
+    function startQuestionTimer() {
+      clearInterval(questionTimerInterval);
+      questionTimerInterval = setInterval(() => {
+        questionTimeLeft--;
+        updateQuestionTimer();
+        if (questionTimeLeft <= 0) {
+          clearInterval(questionTimerInterval);
+          saveCurrentResponse();
+          moveToNextQuestion();
+        }
+      }, 1000);
+    }
+
+    function updateQuestionTimer() {
+      const minutes = Math.floor(questionTimeLeft / 60);
+      const seconds = questionTimeLeft % 60;
+      questionTimerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      const progress = (questionTimeLeft / questionDuration) * 100;
+      questionTimerProgress.style.width = `${progress}%`;
+      if (questionTimeLeft <= 30) {
+        questionTimerProgress.classList.add('timer-warning');
+        if (questionTimeLeft <= 10) {
+          questionTimerElement.classList.add('bg-danger');
+          new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play();
+        }
+      } else {
+        questionTimerProgress.classList.remove('timer-warning');
+        questionTimerElement.classList.remove('bg-danger');
+      }
+    }
+
+    function updateTestTimer() {
+      const minutes = Math.floor(testTimeLeft / 60);
+      const seconds = testTimeLeft % 60;
+      testTimerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      const progress = (testTimeLeft / testDuration) * 100;
+      testTimerProgress.style.width = `${progress}%`;
+      if (testTimeLeft <= 120) testTimerProgress.classList.add('timer-warning');
+      if (testTimeLeft <= 0) {
+        submitTest();
+      } else {
+        testTimeLeft--;
+        localStorage.setItem('test_{{ attempt.id }}_testTimeLeft', testTimeLeft);
+        setTimeout(updateTestTimer, 1000);
+      }
+    }
+
+    function saveCurrentResponse() {
+      const currentCard = questionCards[currentQuestionIndex];
+      const qid = currentCard.querySelector('input[type="radio"]').dataset.questionId;
+      const selectedInput = currentCard.querySelector('input[type="radio"]:checked');
+      const timeTakenInput = currentCard.querySelector(`input[name="time_taken_${qid}"]`);
+      const timeTaken = Math.min(Math.floor((Date.now() - questionStartTimes[qid]) / 1000), questionDuration);
+
+      timeTakenInput.value = timeTaken;
+      if (selectedInput) {
+        const answer = selectedInput.value;
+        responses[qid] = { answer: answer, time: timeTaken };
+        localStorage.setItem('test_{{ attempt.id }}_responses', JSON.stringify(responses));
+        console.log(`Saved response for question ${qid}:`, responses[qid]);
+      } else {
+        console.log(`No response selected for question ${qid}`);
+      }
+      console.log('Current localStorage responses:', responses);
+    }
+
+    function moveToNextQuestion() {
+      if (currentQuestionIndex < totalQuestions - 1) {
+        currentQuestionIndex++;
+        showQuestion(currentQuestionIndex);
+      } else {
+        submitTest();
+      }
+    }
+
+    function submitTest() {
+      saveCurrentResponse();
+      spinnerOverlay.style.display = 'flex';
+      const formData = new FormData(form);
+      const formDataLog = {};
+
+      // Use localStorage responses to populate FormData
+      Object.keys(responses).forEach(qid => {
+        const timeTakenInput = document.querySelector(`input[name="time_taken_${qid}"]`);
+        const timeTaken = responses[qid].time || 0;
+        const answer = responses[qid].answer || '';
+        formData.set(`answer_${qid}`, answer);
+        formData.set(`time_taken_${qid}`, timeTaken);
+        formDataLog[qid] = { answer: answer, time: timeTaken };
+        if (timeTakenInput) timeTakenInput.value = timeTaken;
+      });
+
+      console.log('FormData prepared for submission:', formDataLog);
+      console.log('FormData entries:', [...formData.entries()]);
+
+      const headers = {
+        'X-CSRFToken': '{{ csrf_token }}'
+      };
+      console.log('PATCH request headers:', headers);
+
+      fetch('{% url 'attempt_detail' attempt.id %}', {
+        method: 'PATCH',
+        headers: headers,
+        redirect: 'manual',
+        body: formData
+      }).then(response => {
+        spinnerOverlay.style.display = 'none';
+        console.log('PATCH response status:', response.status);
+        return response.json().then(data => ({ status: response.status, data }));
+      }).then(({ status, data }) => {
+        console.log('PATCH response data:', data);
+        if (status === 200) {
+          localStorage.removeItem('test_{{ attempt.id }}_responses');
+          localStorage.removeItem('test_{{ attempt.id }}_testTimeLeft');
+          localStorage.removeItem('test_{{ attempt.id }}_currentQuestion');
+          window.location.href = '{% url 'test_results' %}';
+        } else {
+          console.error('PATCH failed with status:', status, 'data:', data);
+          alert('Failed to submit test. Please try again.');
+        }
+      }).catch(error => {
+        spinnerOverlay.style.display = 'none';
+        console.error('PATCH submission error:', error);
+        alert('An error occurred. Please try again.');
+      });
+    }
+
+    // Restore saved responses
+    Object.keys(responses).forEach(qid => {
+      const input = document.querySelector(`input[name="answer_${qid}"][value="${responses[qid].answer}"]`);
+      if (input) input.checked = true;
+      console.log(`Restored response for question ${qid}:`, responses[qid]);
+    });
+
+    // Handle radio button changes
+    document.querySelectorAll('input[type="radio"]').forEach(input => {
+      input.addEventListener('change', function() {
+        const qid = this.dataset.questionId;
+        const answer = this.value;
+        const timeTaken = Math.min(Math.floor((Date.now() - questionStartTimes[qid]) / 1000), questionDuration);
+        responses[qid] = { answer: answer, time: timeTaken };
+        localStorage.setItem('test_{{ attempt.id }}_responses', JSON.stringify(responses));
+        const nextBtn = this.closest('.question-card').querySelector('.next-btn');
+        nextBtn.classList.add('visible');
+        console.log(`Radio changed for question ${qid}: answer=${answer}, time=${timeTaken}`);
+        console.log('Updated localStorage responses:', responses);
+      });
+    });
+
+    // Handle Next button clicks
+    document.querySelectorAll('.next-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        saveCurrentResponse();
+        moveToNextQuestion();
+      });
+    });
+
+    // Initialize
+    showQuestion(currentQuestionIndex);
+    updateTestTimer();
+  });
+</script>
+{% endif %}
+{% endblock %}
+{% comment %} {% extends 'base/base.html' %}
+{% load static form_tags %}
+
+{% block title %}Take Test - MCQ Master{% endblock %}
+
+{% block extra_css %}
+<style>
+  .test-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .test-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+  }
+  .test-card:hover {
+    transform: translateY(-5px);
+  }
+  .question-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    animation: fadeIn 0.5s ease-in;
+    display: none;
+  }
+  .question-card.active {
+    display: block;
+  }
+  .timer-progress {
+    height: 10px;
+    border-radius: 5px;
+    transition: width 1s linear;
+  }
+  .timer-warning {
+    background-color: #dc3545 !important;
+  }
+  .option-label {
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 5px;
+    transition: background 0.2s;
+  }
+  .option-label:hover {
+    background: #e9ecef;
+  }
+  .option-selected {
+    background: #d1e7dd;
+    font-weight: bold;
+  }
+  .spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  .next-btn {
+    display: none;
+  }
+  .next-btn.visible {
+    display: inline-block;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="test-container">
+  <div class="card test-card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h3 class="mb-0">{{ test.title }}</h3>
+      <div class="d-flex align-items-center">
+        <span id="test-timer" class="badge bg-primary me-2"></span>
+        <span id="test-timer-text" class="text-muted">Test Time Remaining</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="progress mb-3">
+        <div id="test-timer-progress" class="progress-bar timer-progress" role="progressbar" style="width: 100%;"></div>
+      </div>
+      <div class="progress mb-3">
+        <div id="question-timer-progress" class="progress-bar timer-progress" role="progressbar" style="width: 100%;"></div>
+      </div>
+      <div class="text-center mb-3">
+        <span id="question-timer" class="badge bg-secondary"></span>
+        <span id="question-timer-text" class="text-muted">Question Time Remaining</span>
+      </div>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% if attempt.end_time %}
+        <div class="alert alert-info text-center">
+          Test submitted. Score: {{ attempt.score|default:"N/A" }} / {{ test.questions.count }}
+        </div>
+      {% else %}
+        <form id="test-form" method="post" action="">
+          {% csrf_token %}
+          {% for question in questions %}
+            <div class="question-card" data-question-index="{{ forloop.counter0 }}">
+              <h5>{{ forloop.counter }}. {{ question.question_text }}</h5>
+              <div class="options">
+                {% for option in 'ABCD' %}
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="answer_{{ question.id }}"
+                           id="answer_{{ question.id }}_{{ option }}" value="{{ option }}"
+                           data-question-id="{{ question.id }}"
+                           {% if responses|lookup:question.id|attr:"selected_answer" == option %}checked{% endif %}>
+                    <label class="form-check-label option-label" for="answer_{{ question.id }}_{{ option }}">
+                      {{ question.options|lookup:option }}
+                    </label>
+                  </div>
+                {% endfor %}
+                <input type="hidden" name="time_taken_{{ question.id }}" id="time_taken_{{ question.id }}" value="0">
+              </div>
+              <div class="text-center mt-3">
+                <button type="button" class="btn btn-primary next-btn" data-question-id="{{ question.id }}">Next</button>
+              </div>
+            </div>
+          {% endfor %}
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="spinner-overlay" id="spinner-overlay">
+  <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not attempt.end_time %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const testDuration = {{ test.duration }} * 60; // Test duration in seconds (10 min)
+    const questionDuration = 120; // 2 minutes per question
+    const startTime = new Date('{{ attempt.start_time|date:"c" }}').getTime();
+    const form = document.getElementById('test-form');
+    const testTimerElement = document.getElementById('test-timer');
+    const testTimerProgress = document.getElementById('test-timer-progress');
+    const questionTimerElement = document.getElementById('question-timer');
+    const questionTimerProgress = document.getElementById('question-timer-progress');
+    const spinnerOverlay = document.getElementById('spinner-overlay');
+    const questionCards = document.querySelectorAll('.question-card');
+    const totalQuestions = questionCards.length;
+    let currentQuestionIndex = parseInt(localStorage.getItem('test_{{ attempt.id }}_currentQuestion')) || 0;
+    let testTimeLeft = localStorage.getItem('test_{{ attempt.id }}_testTimeLeft') || calculateTestTimeLeft();
+    let questionTimeLeft = questionDuration;
+    let questionStartTimes = {};
+    let responses = JSON.parse(localStorage.getItem('test_{{ attempt.id }}_responses')) || {};
+    let questionTimerInterval = null;
+
+    // Initialize question start times
+    {% for question in questions %}
+      questionStartTimes[{{ question.id }}] = Date.now();
+    {% endfor %}
+
+    function calculateTestTimeLeft() {
+      const now = new Date().getTime();
+      const endTime = startTime + testDuration * 1000;
+      return Math.max(0, Math.floor((endTime - now) / 1000));
+    }
+
+    function showQuestion(index) {
+      questionCards.forEach((card, i) => {
+        card.classList.toggle('active', i === index);
+      });
+      const qid = questionCards[index].querySelector('input[type="radio"]').dataset.questionId;
+      questionStartTimes[qid] = Date.now();
+      const nextBtn = questionCards[index].querySelector('.next-btn');
+      const inputs = questionCards[index].querySelectorAll('input[type="radio"]');
+      nextBtn.classList.toggle('visible', Array.from(inputs).some(input => input.checked));
+      questionTimeLeft = questionDuration;
+      updateQuestionTimer();
+      startQuestionTimer();
+      localStorage.setItem('test_{{ attempt.id }}_currentQuestion', index);
+    }
+
+    function startQuestionTimer() {
+      clearInterval(questionTimerInterval);
+      questionTimerInterval = setInterval(() => {
+        questionTimeLeft--;
+        updateQuestionTimer();
+        if (questionTimeLeft <= 0) {
+          clearInterval(questionTimerInterval);
+          saveCurrentResponse();
+          moveToNextQuestion();
+        }
+      }, 1000);
+    }
+
+    function updateQuestionTimer() {
+      const minutes = Math.floor(questionTimeLeft / 60);
+      const seconds = questionTimeLeft % 60;
+      questionTimerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      const progress = (questionTimeLeft / questionDuration) * 100;
+      questionTimerProgress.style.width = `${progress}%`;
+      if (questionTimeLeft <= 30) {
+        questionTimerProgress.classList.add('timer-warning');
+        if (questionTimeLeft <= 10) {
+          questionTimerElement.classList.add('bg-danger');
+          new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play();
+        }
+      } else {
+        questionTimerProgress.classList.remove('timer-warning');
+        questionTimerElement.classList.remove('bg-danger');
+      }
+    }
+
+    function updateTestTimer() {
+      const minutes = Math.floor(testTimeLeft / 60);
+      const seconds = testTimeLeft % 60;
+      testTimerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      const progress = (testTimeLeft / testDuration) * 100;
+      testTimerProgress.style.width = `${progress}%`;
+      if (testTimeLeft <= 120) testTimerProgress.classList.add('timer-warning');
+      if (testTimeLeft <= 0) {
+        submitTest();
+      } else {
+        testTimeLeft--;
+        localStorage.setItem('test_{{ attempt.id }}_testTimeLeft', testTimeLeft);
+        setTimeout(updateTestTimer, 1000);
+      }
+    }
+
+    function saveCurrentResponse() {
+      const currentCard = questionCards[currentQuestionIndex];
+      const qid = currentCard.querySelector('input[type="radio"]').dataset.questionId;
+      const selectedInput = currentCard.querySelector('input[type="radio"]:checked');
+      const timeTakenInput = currentCard.querySelector(`input[name="time_taken_${qid}"]`);
+      const timeTaken = Math.min(Math.floor((Date.now() - questionStartTimes[qid]) / 1000), questionDuration);
+
+      timeTakenInput.value = timeTaken;
+      if (selectedInput) {
+        const answer = selectedInput.value;
+        responses[qid] = { answer: answer, time: timeTaken };
+        localStorage.setItem('test_{{ attempt.id }}_responses', JSON.stringify(responses));
+
+        fetch('{% url 'response_create' %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+          },
+          body: JSON.stringify({
+            attempt: {{ attempt.id }},
+            question: qid,
+            selected_answer: answer,
+            time_taken: timeTaken
+          })
+        }).then(response => {
+          if (!response.ok) console.error('Failed to save response');
+        });
+      }
+    }
+
+    function moveToNextQuestion() {
+      if (currentQuestionIndex < totalQuestions - 1) {
+        currentQuestionIndex++;
+        showQuestion(currentQuestionIndex);
+      } else {
+        submitTest();
+      }
+    }
+
+    function submitTest() {
+      saveCurrentResponse();
+      spinnerOverlay.style.display = 'flex';
+      const formData = new FormData(form);
+      questionCards.forEach(card => {
+        const qid = card.querySelector('input[type="radio"]').dataset.questionId;
+        const selectedInput = card.querySelector('input[type="radio"]:checked');
+        const timeTakenInput = card.querySelector(`input[name="time_taken_${qid}"]`);
+        const timeTaken = Math.min(Math.floor((Date.now() - questionStartTimes[qid]) / 1000), questionDuration);
+        formData.set(`answer_${qid}`, selectedInput ? selectedInput.value : '');
+        formData.set(`time_taken_${qid}`, timeTaken);
+      });
+
+      fetch('{% url 'attempt_detail' attempt.id %}', {
+        method: 'PATCH',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        redirect: 'manual',
+        body: formData
+      }).then(response => {
+        spinnerOverlay.style.display = 'none';
+        if (response.status === 200) {
+          localStorage.removeItem('test_{{ attempt.id }}_responses');
+          localStorage.removeItem('test_{{ attempt.id }}_testTimeLeft');
+          localStorage.removeItem('test_{{ attempt.id }}_currentQuestion');
+          window.location.href = '{% url 'test_results' %}';
+        } else {
+          alert('Failed to submit test. Please try again.');
+        }
+      }).catch(error => {
+        spinnerOverlay.style.display = 'none';
+        console.error('Submission error:', error);
+        alert('An error occurred. Please try again.');
+      });
+    }
+
+    // Restore saved responses
+    Object.keys(responses).forEach(qid => {
+      const input = document.querySelector(`input[name="answer_${qid}"][value="${responses[qid].answer}"]`);
+      if (input) input.checked = true;
+    });
+
+    // Handle radio button changes
+    document.querySelectorAll('input[type="radio"]').forEach(input => {
+      input.addEventListener('change', function() {
+        const qid = this.dataset.questionId;
+        const nextBtn = this.closest('.question-card').querySelector('.next-btn');
+        nextBtn.classList.add('visible');
+      });
+    });
+
+    // Handle Next button clicks
+    document.querySelectorAll('.next-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        saveCurrentResponse();
+        moveToNextQuestion();
+      });
+    });
+
+    // Initialize
+    showQuestion(currentQuestionIndex);
+    updateTestTimer();
+  });
+</script>
+{% endif %}
+{% endblock %} {% endcomment %}
+{% comment %} {% extends 'base/base.html' %}
+{% load static form_tags %}
+
+{% block title %}Take Test - MCQ Master{% endblock %}
+
+{% block extra_css %}
+<style>
+  .test-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .test-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+  }
+  .test-card:hover {
+    transform: translateY(-5px);
+  }
+  .question-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    animation: fadeIn 0.5s ease-in;
+  }
+  .timer-progress {
+    height: 10px;
+    border-radius: 5px;
+    transition: width 1s linear;
+  }
+  .timer-warning {
+    background-color: #dc3545 !important;
+  }
+  .option-label {
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 5px;
+    transition: background 0.2s;
+  }
+  .option-label:hover {
+    background: #e9ecef;
+  }
+  .option-selected {
+    background: #d1e7dd;
+    font-weight: bold;
+  }
+  .spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="test-container">
+  <div class="card test-card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h3 class="mb-0">{{ test.title }}</h3>
+      <div class="d-flex align-items-center">
+        <span id="timer" class="badge bg-primary me-2"></span>
+        <span id="timer-text" class="text-muted">Time Remaining</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="progress mb-3">
+        <div id="timer-progress" class="progress-bar timer-progress" role="progressbar" style="width: 100%;"></div>
+      </div>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% if attempt.end_time %}
+        <div class="alert alert-info text-center">
+          Test submitted. Score: {{ attempt.score }} / {{ test.questions.count }}
+        </div>
+      {% else %}
+        <form id="test-form" method="post" action="">
+          {% csrf_token %}
+          {% for question in questions %}
+            <div class="question-card">
+              <h5>{{ forloop.counter }}. {{ question.question_text }}</h5>
+              <div class="options">
+                {% for option in 'ABCD' %}
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="answer_{{ question.id }}"
+                           id="answer_{{ question.id }}_{{ option }}" value="{{ option }}"
+                           data-question-id="{{ question.id }}"
+                           {% if responses|lookup:question.id|attr:"selected_answer" == option %}checked{% endif %}>
+                    <label class="form-check-label option-label" for="answer_{{ question.id }}_{{ option }}">
+                      {{ question.options|lookup:option }}
+                    </label>
+                  </div>
+                {% endfor %}
+                <input type="hidden" name="time_taken_{{ question.id }}" id="time_taken_{{ question.id }}" value="30">
+              </div>
+            </div>
+          {% endfor %}
+          <div class="text-center">
+            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">Submit Test</button>
+            <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="spinner-overlay" id="spinner-overlay">
+  <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not attempt.end_time %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const duration = {{ test.duration }} * 60;              // Total seconds
+  const startTime = new Date('{{ attempt.start_time|date:"c" }}').getTime();
+  const form = document.getElementById('test-form');
+  const timerEl = document.getElementById('timer');
+  const progressEl = document.getElementById('timer-progress');
+  const spinner = document.getElementById('spinner-overlay');
+
+  // Track per-question start times
+  const questionStartTimes = {};
+  {% for question in questions %}
+    questionStartTimes[{{ question.id }}] = Date.now();
+  {% endfor %}
+
+  // Load saved answers from localStorage (just the selected option)
+  let savedAnswers = JSON.parse(
+    localStorage.getItem('test_{{ attempt.id }}_responses') || '{}'
+  );
+
+  // Restore selections
+  Object.entries(savedAnswers).forEach(([qid, ans]) => {
+    const input = document.querySelector(
+      `input[name="answer_${qid}"][value="${ans}"]`
+    );
+    if (input) input.checked = true;
+  });
+
+  // When a radio changes, save just the answer
+  document.querySelectorAll('input[type="radio"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const qid = radio.dataset.questionId;
+      savedAnswers[qid] = radio.value;
+      localStorage.setItem(
+        'test_{{ attempt.id }}_responses',
+        JSON.stringify(savedAnswers)
+      );
+      // reset timer for that question
+      questionStartTimes[qid] = Date.now();
+    });
+  });
+
+  // Countdown timer
+  let timeLeft = parseInt(
+    localStorage.getItem('test_{{ attempt.id }}_timeLeft') || 
+    Math.floor((startTime + duration*1000 - Date.now())/1000),
+    10
+  );
+
+  function tick() {
+    const mins = Math.floor(timeLeft/60);
+    const secs = timeLeft%60;
+    timerEl.textContent = `${mins}:${secs<10?'0':''}${secs}`;
+    progressEl.style.width = `${(timeLeft/duration)*100}%`;
+
+    if (timeLeft <= 120) progressEl.classList.add('timer-warning');
+    if (timeLeft <= 30) timerEl.classList.add('bg-danger');
+
+    if (timeLeft <= 0) {
+      submitForm();
+    } else {
+      timeLeft--;
+      localStorage.setItem('test_{{ attempt.id }}_timeLeft', timeLeft);
+      setTimeout(tick, 1000);
+    }
+  }
+  tick();
+
+  // Build and send the PATCH with all answers + times
+  function submitForm() {
+    spinner.style.display = 'flex';
+    const payload = new FormData();
+
+    {% for question in questions %}
+      const answer = savedAnswers['{{ question.id }}'];
+      if (answer) {
+        payload.append('answer_{{ question.id }}', answer);
+        const elapsed = Math.min(
+          Math.floor((Date.now() - questionStartTimes[{{ question.id }}])/1000),
+          duration
+        );
+        payload.append('time_taken_{{ question.id }}', elapsed);
+      }
+    {% endfor %}
+
+    fetch("{% url 'attempt_detail' attempt.id %}", {
+      method: 'PATCH',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      redirect: 'manual',
+      body: payload
+    })
+    .then(res => {
+      spinner.style.display = 'none';
+      if (res.ok) {
+        localStorage.removeItem('test_{{ attempt.id }}_responses');
+        localStorage.removeItem('test_{{ attempt.id }}_timeLeft');
+        window.location.href = "{% url 'test_results' attempt.id %}";
+      } else {
+        alert('Failed to submit test. Please try again.');
+      }
+    })
+    .catch(() => {
+      spinner.style.display = 'none';
+      alert('An error occurred submitting the test.');
+    });
+  }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    submitForm();
+  });
+});
+</script>
+{% endif %}
+{% endblock %} {% endcomment %}
+{% comment %} {% extends 'base/base.html' %}
+{% load static form_tags %}
+
+{% block title %}Take Test - MCQ Master{% endblock %}
+
+{% block extra_css %}
+<style>
+  .test-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .test-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+  }
+  .test-card:hover {
+    transform: translateY(-5px);
+  }
+  .question-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    animation: fadeIn 0.5s ease-in;
+  }
+  .timer-progress {
+    height: 10px;
+    border-radius: 5px;
+    transition: width 1s linear;
+  }
+  .timer-warning {
+    background-color: #dc3545 !important;
+  }
+  .option-label {
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 5px;
+    transition: background 0.2s;
+  }
+  .option-label:hover {
+    background: #e9ecef;
+  }
+  .option-selected {
+    background: #d1e7dd;
+    font-weight: bold;
+  }
+  .spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="test-container">
+  <div class="card test-card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h3 class="mb-0">{{ test.title }}</h3>
+      <div class="d-flex align-items-center">
+        <span id="timer" class="badge bg-primary me-2"></span>
+        <span id="timer-text" class="text-muted">Time Remaining</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="progress mb-3">
+        <div id="timer-progress" class="progress-bar timer-progress" role="progressbar" style="width: 100%;"></div>
+      </div>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% if attempt.end_time %}
+        <div class="alert alert-info text-center">
+          Test submitted. Score: {{ attempt.score }} / {{ test.questions.count }}
+        </div>
+      {% else %}
+        <form id="test-form" method="post" action="{% url 'attempt_detail' attempt.id %}">
+          {% csrf_token %}
+          {% for question in questions %}
+            <div class="question-card">
+              <h5>{{ forloop.counter }}. {{ question.question_text }}</h5>
+              <div class="options">
+                {% for option in 'ABCD' %}
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="answer_{{ question.id }}"
+                           id="answer_{{ question.id }}_{{ option }}" value="{{ option }}"
+                           data-question-id="{{ question.id }}"
+                           {% if responses|lookup:question.id|attr:"selected_answer" == option %}checked{% endif %}>
+                    <label class="form-check-label option-label" for="answer_{{ question.id }}_{{ option }}">
+                      {{ question.options|lookup:option }}
+                    </label>
+                  </div>
+                {% endfor %}
+                <input type="hidden" name="time_taken_{{ question.id }}" id="time_taken_{{ question.id }}" value="30">
+              </div>
+            </div>
+          {% endfor %}
+          <div class="text-center">
+            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">Submit Test</button>
+            <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="spinner-overlay" id="spinner-overlay">
+  <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not attempt.end_time %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const duration = {{ test.duration }} * 60; // Duration in seconds
+    const startTime = new Date('{{ attempt.start_time|date:"c" }}').getTime();
+    const form = document.getElementById('test-form');
+    const timerElement = document.getElementById('timer');
+    const timerProgress = document.getElementById('timer-progress');
+    const timeTakenInputs = document.querySelectorAll('input[name^="time_taken_"]');
+    const submitBtn = document.getElementById('submit-btn');
+    const spinnerOverlay = document.getElementById('spinner-overlay');
+    let questionStartTimes = {};
+    let responses = JSON.parse(localStorage.getItem('test_{{ attempt.id }}_responses')) || {};
+    let timeLeft = localStorage.getItem('test_{{ attempt.id }}_timeLeft') || calculateTimeLeft();
+
+    function calculateTimeLeft() {
+      const now = new Date().getTime();
+      const endTime = startTime + duration * 1000;
+      return Math.max(0, Math.floor((endTime - now) / 1000));
+    }
+
+    // Initialize question start times
+    {% for question in questions %}
+      questionStartTimes[{{ question.id }}] = Date.now();
+    {% endfor %}
+
+    // Restore saved responses
+    Object.keys(responses).forEach(qid => {
+      const input = document.querySelector(`input[name="answer_${qid}"][value="${responses[qid].answer}"]`);
+      if (input) input.checked = true;
+    });
+
+    // Save response via AJAX
+    function saveResponse(questionId, answer) {
+      fetch('{% url 'response_create' %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+          attempt: {{ attempt.id }},
+          question: questionId,
+          selected_answer: answer,
+          time_taken: Math.floor((Date.now() - questionStartTimes[questionId]) / 1000)
+        })
+      }).then(response => {
+        if (!response.ok) console.error('Failed to save response');
+      });
+    }
+
+    // Handle radio button changes
+    document.querySelectorAll('input[type="radio"]').forEach(input => {
+      input.addEventListener('change', function() {
+        const qid = this.dataset.questionId;
+        responses[qid] = { answer: this.value, time: Date.now() };
+        localStorage.setItem('test_{{ attempt.id }}_responses', JSON.stringify(responses));
+        saveResponse(qid, this.value);
+        questionStartTimes[qid] = Date.now(); // Reset timer for new answer
+      });
+    });
+
+    function updateTimer() {
+      const minutes = Math.floor(timeLeft / 60);
+      const seconds = timeLeft % 60;
+      timerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      const progress = (timeLeft / duration) * 100;
+      timerProgress.style.width = `${progress}%`;
+      if (timeLeft <= 120) timerProgress.classList.add('timer-warning');
+      if (timeLeft <= 30) {
+        timerElement.classList.add('bg-danger');
+        new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play();
+      }
+      if (timeLeft <= 0) {
+        timeTakenInputs.forEach(input => {
+          const qid = input.name.replace('time_taken_', '');
+          input.value = Math.min(Math.floor((Date.now() - questionStartTimes[qid]) / 1000), 300);
+        });
+        localStorage.removeItem('test_{{ attempt.id }}_responses');
+        localStorage.removeItem('test_{{ attempt.id }}_timeLeft');
+        form.submit();
+      } else {
+        timeLeft--;
+        localStorage.setItem('test_{{ attempt.id }}_timeLeft', timeLeft);
+        setTimeout(updateTimer, 1000);
+      }
+    }
+
+    // Handle form submission
+    form.addEventListener('submit', function(e) {
+      spinnerOverlay.style.display = 'flex';
+      timeTakenInputs.forEach(input => {
+        const qid = input.name.replace('time_taken_', '');
+        input.value = Math.min(Math.floor((Date.now() - questionStartTimes[qid]) / 1000), 300);
+      });
+      localStorage.removeItem('test_{{ attempt.id }}_responses');
+      localStorage.removeItem('test_{{ attempt.id }}_timeLeft');
+    });
+
+    updateTimer();
+  });
+</script>
+{% endif %}
+{% endblock %} {% endcomment %}
+{% comment %} 
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Take Test - MCQ Master{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1 class="text-center mb-4" data-aos="fade-up">Test: {{ test.title }}</h1>
+  <div class="row justify-content-center">
+    <div class="col-md-10">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Duration: {{ test.duration }} minutes</h5>
+          <div id="timer" class="badge bg-primary"></div>
+        </div>
+        <div class="card-body">
+          {% if attempt.end_time %}
+            <div class="alert alert-info">This test has been submitted. Score: {{ attempt.score }}</div>
+          {% else %}
+            <form method="post" action="{% url 'attempt_detail' attempt.id %}" id="test-form">
+              {% csrf_token %}
+              {% for question in questions %}
+                <div class="mb-4">
+                  <h6>{{ forloop.counter }}. {{ question.question_text }}</h6>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_{{ question.id }}" id="answer_{{ question.id }}_A" value="A" {% if responses.question.id.selected_answer == 'A' %}checked{% endif %} required>
+                    <label class="form-check-label" for="answer_{{ question.id }}_A">{{ question.option_a }}</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_{{ question.id }}" id="answer_{{ question.id }}_B" value="B" {% if responses.question.id.selected_answer == 'B' %}checked{% endif %}>
+                    <label class="form-check-label" for="answer_{{ question.id }}_B">{{ question.option_b }}</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_{{ question.id }}" id="answer_{{ question.id }}_C" value="C" {% if responses.question.id.selected_answer == 'C' %}checked{% endif %}>
+                    <label class="form-check-label" for="answer_{{ question.id }}_C">{{ question.option_c }}</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_{{ question.id }}" id="answer_{{ question.id }}_D" value="D" {% if responses.question.id.selected_answer == 'D' %}checked{% endif %}>
+                    <label class="form-check-label" for="answer_{{ question.id }}_D">{{ question.option_d }}</label>
+                  </div>
+                  <input type="hidden" name="time_taken_{{ question.id }}" id="time_taken_{{ question.id }}" value="30">
+                </div>
+              {% endfor %}
+              <div class="text-center">
+                <button type="submit" class="btn btn-primary">Submit Test</button>
+                <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+              </div>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+{% if not attempt.end_time %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const duration = {{ test.duration }} * 60; // Convert minutes to seconds
+    let timeLeft = duration;
+    const timerElement = document.getElementById('timer');
+    const form = document.getElementById('test-form');
+    const timeTakenInputs = document.querySelectorAll('input[name^="time_taken_"]');
+    
+    let questionStartTimes = {};
+    {% for question in questions %}
+      questionStartTimes[{{ question.id }}] = Date.now();
+    {% endfor %}
+
+    function updateTimer() {
+      const minutes = Math.floor(timeLeft / 60);
+      const seconds = timeLeft % 60;
+      timerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      if (timeLeft <= 0) {
+        // Update time taken for each question
+        timeTakenInputs.forEach(input => {
+          const questionId = input.name.replace('time_taken_', '');
+          const timeSpent = Math.floor((Date.now() - questionStartTimes[questionId]) / 1000);
+          input.value = Math.min(timeSpent, 300); // Cap at 5 minutes
+        });
+        form.submit();
+      } else {
+        timeLeft--;
+        setTimeout(updateTimer, 1000);
+      }
+    }
+
+    updateTimer();
+  });
+</script>
+{% endif %}
+{% endblock %}
+{% endblock %} {% endcomment %}

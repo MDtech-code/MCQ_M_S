@@ -1,0 +1,120 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Verify Email - MCQ Master{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-primary border-2 shadow-lg">
+                <div class="card-body p-4 text-center">
+                    {% if messages %}
+                        {% for message in messages %}
+                            {% if message.tags == 'success' %}
+                                <div class="mb-4">
+                                    <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                                </div>
+                                <h4 class="mb-3">Email Verified!</h4>
+                                <p class="text-muted">Redirecting to profile in <span id="countdown">3</span> seconds...</p>
+                                <div class="mt-4">
+                                    <a href="{% url 'profile' %}" class="btn btn-primary">
+                                        <i class="bi bi-person me-2"></i>Go to Profile Now
+                                    </a>
+                                </div>
+                            {% elif message.tags == 'error' %}
+                                <div class="mb-4">
+                                    <i class="bi bi-x-circle-fill text-danger fs-1"></i>
+                                </div>
+                                <h4 class="mb-3">Verification Failed</h4>
+                                <p class="text-muted">{{ message }}</p>
+                                <form method="post" class="mt-4" action={% url "resend_verification" %}>
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary" >
+                                        <i class="bi bi-envelope-arrow-up me-2" ></i>Resend Verification
+                                    </button>
+                                </form>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if messages %}
+    {% for message in messages %}
+        {% if message.tags == 'success' %}
+            <script>
+                let countdown = 3;
+                const countdownElement = document.getElementById('countdown');
+                const interval = setInterval(() => {
+                    countdown--;
+                    countdownElement.textContent = countdown;
+                    if (countdown <= 0) {
+                        clearInterval(interval);
+                        window.location.href = "{% url 'profile' %}";
+                    }
+                }, 1000);
+            </script>
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% endblock %}
+{% comment %} 
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Verify Email - MCQ Test System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm" >
+            <div class="card-body text-center">
+                {% if messages %}
+                    {% for message in messages %}
+                        {% if message.tags == 'success' %}
+                            <h5 class="text-success">Email Verified!</h5>
+                            <p>Your email has been successfully verified.</p>
+                            <p>Redirecting to profile in <span id="countdown">3</span> seconds...</p>
+                            <a href="{% url 'profile' %}" class="btn btn-primary mt-3">Go to profile</a>
+                        {% elif message.tags == 'error' %}
+                            <h5 class="text-danger">Verification Failed</h5>
+                            <p>{{ message }}</p>
+                            <form method="post" action="{% url 'resend_verification' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary mt-3">Resend Verification Email</button>
+                            </form>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+{% if messages %}
+    {% for message in messages %}
+        {% if message.tags == 'success' %}
+            <script>
+                let countdown = 3;
+                const countdownElement = document.getElementById('countdown');
+                const interval = setInterval(() => {
+                    countdown--;
+                    countdownElement.textContent = countdown;
+                    if (countdown <= 0) {
+                        clearInterval(interval);
+                        window.location.href = "{% url 'profile' %}";
+                    }
+                }, 1000);
+            </script>
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% endblock %}
+{% endblock %} {% endcomment %}

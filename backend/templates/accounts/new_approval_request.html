@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>New Teacher Approval Request</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; background-color: #f9f9f9; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #007bff; font-size: 24px; margin-bottom: 20px; }
+        p { font-size: 16px; line-height: 1.6; margin: 10px 0; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+        .button:hover { background-color: #0056b3; }
+        .details { background: #f1f1f1; padding: 15px; border-radius: 5px; margin-top: 20px; }
+        .details p { margin: 5px 0; }
+        .footer { font-size: 14px; color: #777; margin-top: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>New Teacher Approval Request</h1>
+        <p>A new teacher approval request has been submitted by {{ user.username }} ({{ user.email }}).</p>
+        <p>Please review the details below and take appropriate action in the admin panel.</p>
+        
+        <div class="details">
+            <p><strong>Teacher:</strong> {{ user.username }}</p>
+            <p><strong>Email:</strong> {{ user.email }}</p>
+            <p><strong>Qualifications:</strong> {{ approval_request.qualifications }}</p>
+            <p><strong>Message:</strong> {{ approval_request.message|default:"No message provided" }}</p>
+            <p><strong>Document:</strong> 
+                {% if approval_request.document %}
+                    <a href="{{ approval_request.document.url }}">View Document</a>
+                {% else %}
+                    No document uploaded
+                {% endif %}
+            </p>
+            <p><strong>Submitted:</strong> {{ approval_request.created_at|date:"F d, Y H:i" }}</p>
+        </div>
+        
+        <a href="{{ FRONTEND_URL }}{% url 'admin:accounts_approvalrequest_changelist' %}" class="button">Review in Admin Panel</a>
+        
+        <div class="footer">
+            <p>MCQ Master &copy; 2025. All rights reserved.</p>
+            <p>Contact support at <a href="mailto:support@mcqmaster.com">support@mcqmaster.com</a> for assistance.</p>
+        </div>
+    </div>
+</body>
+</html>

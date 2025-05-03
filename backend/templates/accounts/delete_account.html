@@ -1,0 +1,107 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Delete Account - MCQ Master{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-danger border-2 shadow-lg">
+                <div class="card-header bg-danger text-white py-3">
+                    <h4 class="mb-0"><i class="bi bi-exclamation-octagon me-2"></i>Delete Account</h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-danger d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+                        <div>
+                            <strong>Warning:</strong> This action is irreversible. Teachers and admins will have their accounts deactivated.
+                        </div>
+                    </div>
+                    
+                    <form method="post" id= 'delete-account-form' class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Password Field -->
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control password-input" 
+                                   id="password" name="old_password" required>
+                            <label for="password"><i class="bi bi-key me-2"></i>Current Password</label>
+                            <button type="button" aria-label="Show password" class="btn btn-link password-toggle">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            {% if errors.old_password %}
+                                <div class="invalid-feedback d-block">
+                                    {{ errors.old_password|join:", " }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Confirmation Checkbox -->
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" 
+                                   id="confirm_deletion" name="confirm_deletion" required>
+                            <label class="form-check-label text-danger fw-bold" for="confirm_deletion">
+                                <i class="bi bi-check2-circle me-2"></i>
+                                I confirm I want to permanently delete my account
+                            </label>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="bi bi-trash3 me-2"></i>Permanently Delete Account
+                            </button>
+                            <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% comment %} ```html
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Delete Account - MCQ Test System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm" >
+            <div class="card-header bg-danger">
+                <h5 class="mb-0">Delete Account</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> This action is irreversible for students. Teachers and admins will have their accounts deactivated.
+                </div>
+                <form method="post" action="{% url 'delete_account' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        {% if errors.password %}
+                            <div class="text-danger">{{ errors.password|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="confirm_deletion" name="confirm_deletion" required>
+                        <label class="form-check-label" for="confirm_deletion">I confirm I want to delete my account</label>
+                        {% if errors.confirm_deletion %}
+                            <div class="text-danger">{{ errors.confirm_deletion|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-danger">Delete Account</button>
+                        <a href="{% url 'profile' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} {% endcomment %}

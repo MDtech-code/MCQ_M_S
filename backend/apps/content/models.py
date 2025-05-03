@@ -68,6 +68,8 @@ class Question(TimeStampedModel):
     # Versioning for question updates
     version = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
+    source = models.CharField(max_length=50, default='manual')  # options: 'manual', 'auto_nlp'
+
 
     class Meta:
         indexes = [

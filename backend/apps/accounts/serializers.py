@@ -2,9 +2,14 @@ import logging
 from django.forms import ValidationError
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, password_validation
-from .models import StudentProfile, TeacherProfile
+from .models import StudentProfile, TeacherProfile,ApprovalRequest
 from django.contrib.auth import password_validation
-# Get a logger for this module
+from .validators import (
+    validate_phone_number, validate_date_of_birth, validate_gender, validate_avatar,
+    validate_parent_email, validate_grade_level, validate_department,
+    validate_office_number, validate_qualifications, validate_first_name, validate_last_name
+)
+# Get a logger for this moduleGH
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -16,6 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(
         write_only=True, required=True, style={'input_type': 'password'}, label="Confirm Password"
     )
+    
     
     class Meta:
         model = User
@@ -37,16 +43,18 @@ class UserSerializer(serializers.ModelSerializer):
             logger.warning("Password validation error for username=%s: %s", data.get('username'), str(e))
             raise serializers.ValidationError({"password": str(e)})
         
-        logger.debug("Password validation passed for user: %s", data.get('username'))
+        
         return data
     
     def create(self, validated_data):
+        
         validated_data.pop('password2')
         user = User(
             username=validated_data['username'],
             email=validated_data['email'],
             role=validated_data.get('role', User.Role.STUDENT)
         )
+        \
         user.set_password(validated_data['password'])
         user.save()
         logger.info("Created new user: username=%s, id=%s", user.username, user.id)
@@ -58,13 +66,7 @@ class UserLoginSerializer(serializers.Serializer):
         write_only=True, required=True, style={'input_type': 'password'}
     )
     
-    # For login, you may add additional logging in your view rather than here,
-    # as this serializer simply passes data for authentication.
-
-
-
-# apps/accounts/serializers.py
-# apps/accounts/serializers.py
+  
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
 
@@ -134,10 +136,10 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 # apps/accounts/serializers.py
 class DeleteAccountSerializer(serializers.Serializer):
-    password = serializers.CharField(required=True, write_only=True)
+    old_password = serializers.CharField(required=True, write_only=True)
     confirm_deletion = serializers.BooleanField(required=True)
 
-    def validate_password(self, value):
+    def validate_old_password(self, value):
         user = self.context['request'].user
         if not user.check_password(value):
             logger.warning(f"Invalid password for account deletion by {user.email}")
@@ -150,8 +152,6 @@ class DeleteAccountSerializer(serializers.Serializer):
             raise serializers.ValidationError("You must confirm account deletion")
         return value
 
-# apps/accounts/serializers.py
-from .models import User
 class UpdateEmailSerializer(serializers.Serializer):
     new_email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True, write_only=True)
@@ -169,32 +169,98 @@ class UpdateEmailSerializer(serializers.Serializer):
             raise serializers.ValidationError("Incorrect password")
         return value
     
-
-
 class StudentProfileSerializer(serializers.ModelSerializer):
+    phone_number = serializers.CharField(validators=[validate_phone_number], required=False, allow_blank=True, allow_null=True)
+    date_of_birth = serializers.DateField(validators=[validate_date_of_birth], required=False, allow_null=True)
+    gender = serializers.CharField(validators=[validate_gender], required=False, allow_blank=True, allow_null=True)
+    avatar = serializers.ImageField(validators=[validate_avatar], required=False, allow_null=True)
+    grade_level = serializers.CharField(validators=[validate_grade_level], required=False, allow_blank=True, allow_null=True)
+    parent_email = serializers.CharField(validators=[validate_parent_email], required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = StudentProfile
         fields = ['phone_number', 'date_of_birth', 'gender', 'avatar', 'grade_level', 'parent_email']
-        extra_kwargs = {
-            'phone_number': {'required': False},
-            'date_of_birth': {'required': False},
-            'gender': {'required': False},
-            'avatar': {'required': False},
-            'grade_level': {'required': False},
-            'parent_email': {'required': False},
-        }
+
 
 class TeacherProfileSerializer(serializers.ModelSerializer):
+    phone_number = serializers.CharField(validators=[validate_phone_number], required=False, allow_blank=True, allow_null=True)
+    date_of_birth = serializers.DateField(validators=[validate_date_of_birth], required=False, allow_null=True)
+    gender = serializers.CharField(validators=[validate_gender], required=False, allow_blank=True, allow_null=True)
+    avatar = serializers.ImageField(validators=[validate_avatar], required=False, allow_null=True)
+    department = serializers.CharField(validators=[validate_department], required=False, allow_blank=True, allow_null=True)
+    office_number = serializers.CharField(validators=[validate_office_number], required=False, allow_blank=True, allow_null=True)
+    qualifications = serializers.CharField(validators=[validate_qualifications], required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = TeacherProfile
         fields = ['phone_number', 'date_of_birth', 'gender', 'avatar', 'department', 'office_number', 'qualifications']
-        extra_kwargs = {
-            'phone_number': {'required': False},
-            'date_of_birth': {'required': False},
-            'gender': {'required': False},
-            'avatar': {'required': False},
-            'department': {'required': False},
-            'office_number': {'required': False},
-            'qualifications': {'required': False},
-        }
 
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(validators=[validate_first_name], required=False, allow_blank=True, allow_null=True)
+    last_name = serializers.CharField(validators=[validate_last_name], required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name']
+
+
+
+
+class ApprovalRequestSerializer(serializers.ModelSerializer):
+    qualifications = serializers.CharField(required=True)
+    document = serializers.FileField(required=True)
+
+    class Meta:
+        model = ApprovalRequest
+        fields = ('qualifications', 'document', 'message')
+
+    def validate(self, data):
+        document = data.get('document')
+        if document:
+            if document.size > 5 * 1024 * 1024:  # 5MB
+                raise serializers.ValidationError({"document": "File size must be under 5MB."})
+            if not document.name.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png')):
+                raise serializers.ValidationError({"document": "Only PDF, JPEG, or PNG files are allowed."})
+        if not data.get('qualifications').strip():
+            raise serializers.ValidationError({"qualifications": "Qualifications cannot be empty."})
+        return data
+# class StudentProfileSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = StudentProfile
+#         fields = ['phone_number', 'date_of_birth', 'gender', 'avatar', 'grade_level', 'parent_email']
+#         extra_kwargs = {
+#             'phone_number': {'required': False},
+#             'date_of_birth': {'required': False},
+#             'gender': {'required': False},
+#             'avatar': {'required': False},
+#             'grade_level': {'required': False},
+#             'parent_email': {'required': False},
+#         }
+
+
+
+# class TeacherProfileSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = TeacherProfile
+#         fields = ['phone_number', 'date_of_birth', 'gender', 'avatar', 'department', 'office_number', 'qualifications']
+#         extra_kwargs = {
+#             'phone_number': {'required': False},
+#             'date_of_birth': {'required': False},
+#             'gender': {'required': False},
+#             'avatar': {'required': False},
+#             'department': {'required': False},
+#             'office_number': {'required': False},
+#             'qualifications': {'required': False},
+#         }
+
+
+
+# class UserUpdateSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = User
+#         fields = ['first_name', 'last_name']
+#         extra_kwargs = {
+#             'first_name': {'required': False},
+#             'last_name': {'required': False},
+#         }

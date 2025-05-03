@@ -1,0 +1,339 @@
+```html
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Profile - MCQ Test System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm" data-aos="fade-up">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">{{ user.get_role_display }} Profile</h5>
+            </div>
+            <div class="card-body">
+                {% if is_update %}
+                    <form method="post" action="{% url 'profile_update' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <h6>Personal Information</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="first_name" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" value="{{ user_data.first_name|default:'' }}">
+                                {% if errors.first_name %}
+                                    <div class="text-danger">{{ errors.first_name|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="last_name" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" value="{{ user_data.last_name|default:'' }}">
+                                {% if errors.last_name %}
+                                    <div class="text-danger">{{ errors.last_name|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <h6>Profile Information</h6>
+                        <div class="mb-3">
+                            <label for="phone_number" class="form-label">Phone Number</label>
+                            <input type="text" class="form-control" id="phone_number" name="phone_number" value="{{ profile_data.phone_number|default:'' }}">
+                            {% if errors.phone_number %}
+                                <div class="text-danger">{{ errors.phone_number|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="date_of_birth" class="form-label">Date of Birth</label>
+                            <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ profile_data.date_of_birth|default:'' }}">
+                            {% if errors.date_of_birth %}
+                                <div class="text-danger">{{ errors.date_of_birth|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="gender" class="form-label">Gender</label>
+                            <select class="form-select" id="gender" name="gender">
+                                <option value="" {% if not profile_data.gender %}selected{% endif %}>Select</option>
+                                <option value="M" {% if profile_data.gender == 'M' %}selected{% endif %}>Male</option>
+                                <option value="F" {% if profile_data.gender == 'F' %}selected{% endif %}>Female</option>
+                                <option value="O" {% if profile_data.gender == 'O' %}selected{% endif %}>Other</option>
+                            </select>
+                            {% if errors.gender %}
+                                <div class="text-danger">{{ errors.gender|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="avatar" class="form-label">Avatar</label>
+                            <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
+                            {% if profile_data.avatar %}
+                                <small class="form-text">Current: <a href="{{ profile_data.avatar.url }}" target="_blank">View Avatar</a></small>
+                            {% endif %}
+                            {% if errors.avatar %}
+                                <div class="text-danger">{{ errors.avatar|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        {% if user.role == 'ST' %}
+                            <div class="mb-3">
+                                <label for="grade_level" class="form-label">Grade Level</label>
+                                <input type="text" class="form-control" id="grade_level" name="grade_level" value="{{ profile_data.grade_level|default:'' }}">
+                                {% if errors.grade_level %}
+                                    <div class="text-danger">{{ errors.grade_level|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                <label for="parent_email" class="form-label">Parent Email</label>
+                                <input type="email" class="form-control" id="parent_email" name="parent_email" value="{{ profile_data.parent_email|default:'' }}">
+                                {% if errors.parent_email %}
+                                    <div class="text-danger">{{ errors.parent_email|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="mb-3">
+                                <label for="department" class="form-label">Department</label>
+                                <input type="text" class="form-control" id="department" name="department" value="{{ profile_data.department|default:'' }}">
+                                {% if errors.department %}
+                                    <div class="text-danger">{{ errors.department|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                <label for="office_number" class="form-label">Office Number</label>
+                                <input type="text" class="form-control" id="office_number" name="office_number" value="{{ profile_data.office_number|default:'' }}">
+                                {% if errors.office_number %}
+                                    <div class="text-danger">{{ errors.office_number|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                <label for="qualifications" class="form-label">Qualifications</label>
+                                <textarea class="form-control" id="qualifications" name="qualifications" rows="4">{{ profile_data.qualifications|default:'' }}</textarea>
+                                {% if errors.qualifications %}
+                                    <div class="text-danger">{{ errors.qualifications|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a href="{% url 'profile' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            {% if profile.avatar %}
+                                <img src="{{ profile.avatar.url }}" class="img-fluid rounded-circle mb-3" alt="Avatar" style="max-width: 150px;">
+                            {% else %}
+                                <img src="{% static 'images/default-avatar.png' %}" class="img-fluid rounded-circle mb-3" alt="Default Avatar" style="max-width: 150px;">
+                            {% endif %}
+                        </div>
+                        <div class="col-md-8">
+                            <h5>{{ user.get_full_name|default:user.email }}</h5>
+                            <p><strong>Username:</strong> {{ user.username }}</p>
+                            <p><strong>Email:</strong> {{ user.email }} {% if user.is_verified %}<span class="text-success">✅ Verified</span>{% else %}<span class="text-warning">❗ Unverified</span>{% endif %}</p>
+                            <p><strong>Role:</strong> {{ user.get_role_display }}</p>
+                            {% if user.role == 'TE' %}
+                                <p><strong>Approval Status:</strong> {% if user.is_approved %}Approved{% else %}Awaiting Approval{% endif %}</p>
+                            {% endif %}
+                            <h6>Profile Details</h6>
+                            <p><strong>Phone Number:</strong> {{ profile.phone_number|default:'Not set' }}</p>
+                            <p><strong>Date of Birth:</strong> {{ profile.date_of_birth|date:'Y-m-d'|default:'Not set' }}</p>
+                            <p><strong>Gender:</strong> {{ profile.get_gender_display|default:'Not set' }}</p>
+                            {% if user.role == 'ST' %}
+                                <p><strong>Grade Level:</strong> {{ profile.grade_level|default:'Not set' }}</p>
+                                <p><strong>Parent Email:</strong> {{ profile.parent_email|default:'Not set' }}</p>
+                            {% else %}
+                                <p><strong>Department:</strong> {{ profile.department|default:'Not set' }}</p>
+                                <p><strong>Office Number:</strong> {{ profile.office_number|default:'Not set' }}</p>
+                                <p><strong>Qualifications:</strong> {{ profile.qualifications|default:'Not set' }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="text-center mt-4">
+                        <a href="{% url 'profile_update' %}" class="btn btn-primary">Edit Profile</a>
+                        <a href="{% url 'change_password' %}" class="btn btn-outline-primary ms-2">Change Password</a>
+                        <a href="{% url 'update_email' %}" class="btn btn-outline-primary ms-2">Update Email</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% comment %} 
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}
+  {% if is_update %}Update Profile{% else %}My Profile{% endif %} - MCQ Master
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1 class="text-center mb-4" data-aos="fade-up">
+    {% if is_update %}Update Profile{% else %}My Profile{% endif %}
+  </h1>
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      <div class="card shadow-sm">
+        <div class="card-body">
+          {% if is_update %}
+            <form method="post" action="{% url 'profile_update' %}" enctype="multipart/form-data" id="profile-form">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label for="phone_number" class="form-label">Phone Number</label>
+                <input type="tel" class="form-control" id="phone_number" name="phone_number" value="{{ form_data.phone_number|default:profile.phone_number|default_if_none:'' }}">
+                {% if errors.phone_number %}
+                  <div class="text-danger small">{{ errors.phone_number.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="mb-3">
+                <label for="date_of_birth" class="form-label">Date of Birth</label>
+                <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ form_data.date_of_birth|default:profile.date_of_birth|default_if_none:'' }}">
+                {% if errors.date_of_birth %}
+                  <div class="text-danger small">{{ errors.date_of_birth.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="mb-3">
+                <label for="gender" class="form-label">Gender</label>
+                <select class="form-select" id="gender" name="gender">
+                  <option value="">Select Gender</option>
+                  <option value="M" {% if form_data.gender|default:profile.gender == 'M' %}selected{% endif %}>Male</option>
+                  <option value="F" {% if form_data.gender|default:profile.gender == 'F' %}selected{% endif %}>Female</option>
+                  <option value="O" {% if form_data.gender|default:profile.gender == 'O' %}selected{% endif %}>Other</option>
+                </select>
+                {% if errors.gender %}
+                  <div class="text-danger small">{{ errors.gender.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="mb-3">
+                <label for="avatar" class="form-label">Profile Picture</label>
+                <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
+                {% if profile.avatar %}
+                  <img src="{{ profile.avatar.url }}" alt="Avatar" class="img-thumbnail mt-2" style="max-width: 100px;">
+                {% endif %}
+                {% if errors.avatar %}
+                  <div class="text-danger small">{{ errors.avatar.0 }}</div>
+                {% endif %}
+              </div>
+              {% if user.role == 'STUDENT' %}
+                <div class="mb-3">
+                  <label for="grade_level" class="form-label">Grade Level</label>
+                  <input type="text" class="form-control" id="grade_level" name="grade_level" value="{{ form_data.grade_level|default:profile.grade_level|default_if_none:'' }}">
+                  {% if errors.grade_level %}
+                    <div class="text-danger small">{{ errors.grade_level.0 }}</div>
+                  {% endif %}
+                </div>
+                <div class="mb-3">
+                  <label for="parent_email" class="form-label">Parent Email</label>
+                  <input type="email" class="form-control" id="parent_email" name="parent_email" value="{{ form_data.parent_email|default:profile.parent_email|default_if_none:'' }}">
+                  {% if errors.parent_email %}
+                    <div class="text-danger small">{{ errors.parent_email.0 }}</div>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="mb-3">
+                  <label for="department" class="form-label">Department</label>
+                  <input type="text" class="form-control" id="department" name="department" value="{{ form_data.department|default:profile.department|default_if_none:'' }}">
+                  {% if errors.department %}
+                    <div class="text-danger small">{{ errors.department.0 }}</div>
+                  {% endif %}
+                </div>
+                <div class="mb-3">
+                  <label for="office_number" class="form-label">Office Number</label>
+                  <input type="text" class="form-control" id="office_number" name="office_number" value="{{ form_data.office_number|default:profile.office_number|default_if_none:'' }}">
+                  {% if errors.office_number %}
+                    <div class="text-danger small">{{ errors.office_number.0 }}</div>
+                  {% endif %}
+                </div>
+                <div class="mb-3">
+                  <label for="qualifications" class="form-label">Qualifications</label>
+                  <textarea class="form-control" id="qualifications" name="qualifications">{{ form_data.qualifications|default:profile.qualifications|default_if_none:'' }}</textarea>
+                  {% if errors.qualifications %}
+                    <div class="text-danger small">{{ errors.qualifications.0 }}</div>
+                  {% endif %}
+                </div>
+              {% endif %}
+              <div class="text-center">
+                <button type="submit" class="btn btn-primary">Update Profile</button>
+                <a href="{% url 'profile_view' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+              </div>
+            </form>
+          {% else %}
+            <div class="text-center mb-4">
+              {% if profile.avatar %}
+                <img src="{{ profile.avatar.url }}" alt="Profile Picture" class="rounded-circle shadow" style="width: 150px; height: 150px; object-fit: cover;">
+              {% else %}
+                <img src="{% static 'images/default-avatar.png' %}" alt="Default Avatar" class="rounded-circle shadow" style="width: 150px; height: 150px;">
+              {% endif %}
+              <h3 class="mt-3">{{ user.get_full_name|default:user.email }}</h3>
+              <p class="text-muted">
+                {{ user.email }}
+                {% if not user.is_verified %}
+                  <span class="text-warning" title="Email not verified">
+                    <i class="bi bi-envelope-exclamation-fill"></i>
+                  </span>
+                {% endif %}
+              </p>
+              <a href="{% url 'profile_update' %}" class="btn btn-outline-primary">Edit Profile</a>
+            </div>
+            <dl class="row">
+              <dt class="col-sm-4">Phone Number</dt>
+              <dd class="col-sm-8">{{ profile.phone_number|default:"Not set" }}</dd>
+              <dt class="col-sm-4">Date of Birth</dt>
+              <dd class="col-sm-8">{{ profile.date_of_birth|date:"Y-m-d"|default:"Not set" }}</dd>
+              <dt class="col-sm-4">Gender</dt>
+              <dd class="col-sm-8">
+                {% if profile.gender == 'M' %}Male
+                {% elif profile.gender == 'F' %}Female
+                {% elif profile.gender == 'O' %}Other
+                {% else %}Not set
+                {% endif %}
+              </dd>
+              {% if user.role == 'STUDENT' %}
+                <dt class="col-sm-4">Grade Level</dt>
+                <dd class="col-sm-8">{{ profile.grade_level|default:"Not set" }}</dd>
+                <dt class="col-sm-4">Parent Email</dt>
+                <dd class="col-sm-8">{{ profile.parent_email|default:"Not set" }}</dd>
+              {% else %}
+                <dt class="col-sm-4">Department</dt>
+                <dd class="col-sm-8">{{ profile.department|default:"Not set" }}</dd>
+                <dt class="col-sm-4">Office Number</dt>
+                <dd class="col-sm-8">{{ profile.office_number|default:"Not set" }}</dd>
+                <dt class="col-sm-4">Qualifications</dt>
+                <dd class="col-sm-8">{{ profile.qualifications|default:"Not set" }}</dd>
+              {% endif %}
+            </dl>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+{% if is_update %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('profile-form');
+    form.addEventListener('submit', function(event) {
+      const phone = document.getElementById('phone_number').value;
+      const parentEmail = document.getElementById('parent_email');
+      if (phone && !/^\+?\d{10,15}$/.test(phone)) {
+        event.preventDefault();
+        alert('Please enter a valid phone number (10-15 digits).');
+      }
+      if (parentEmail && parentEmail.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail.value)) {
+        event.preventDefault();
+        alert('Please enter a valid parent email.');
+      }
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}
+{% endblock %}
+
+ {% endcomment %}
