@@ -8,7 +8,7 @@ from datetime import timedelta
 class Test(TimeStampedModel):
     title = models.CharField(max_length=255)
     created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True,related_name='created_tests')
-    subjects = models.ManyToManyField('content.Subject')
+    subject = models.ForeignKey('content.Subject', on_delete=models.PROTECT)
     questions = models.ManyToManyField('content.Question', related_name='tests')
     duration = models.PositiveIntegerField(default=10)
     max_attempts = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
@@ -21,11 +21,38 @@ class Test(TimeStampedModel):
             models.Index(fields=['created_by']),
         ]
 
-   
-     
     def validate(self):
-        if not self.subjects.exists():
+        if not self.subject and not self.subjects.exists():
             raise ValidationError("Test must have at least one subject")
+        
+    @property
+    def attempt_percentage(self):
+        """Calculate attempt progress percentage"""
+        if self.max_attempts == 0:
+            return 0
+        # Get attempts count for current user (student) or all users (teacher)
+        attempts_count = self.attempts.count()  # For teacher view
+        if hasattr(self, '_prefetched_objects_cache') and 'user_attempts' in self._prefetched_objects_cache:
+            attempts_count = len(self.user_attempts)  # For student view
+        return min(100, (attempts_count / self.max_attempts) * 100)
+
+    @property
+    def difficulty(self):
+        """Get highest difficulty level from questions"""
+        if hasattr(self, '_prefetched_objects_cache') and 'questions' in self._prefetched_objects_cache:
+            difficulties = [q.difficulty for q in self.questions.all()]
+        else:
+            difficulties = self.questions.values_list('difficulty', flat=True)
+        return max(difficulties, default='E')
+
+    
+    def get_difficulty_display(self):
+        """Human-readable difficulty label"""
+        return {
+            'E': 'Easy',
+            'M': 'Medium',
+            'H': 'Hard'
+        }[self.difficulty]
         
     def __str__(self):
         return self.title

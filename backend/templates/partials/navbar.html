@@ -25,7 +25,7 @@
           <!-- Logged-In User -->
           {% if user.role == 'ST' %}
             <li class="nav-item">
-              <a class="nav-link" href="#">
+              <a class="nav-link" href="{% url "test_list" %}">
                 <i class="bi bi-pencil-square me-1"></i>Take Test
               </a>
             </li>

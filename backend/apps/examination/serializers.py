@@ -10,9 +10,121 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# class TestSerializer(serializers.ModelSerializer):
+#     subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all())
+#     questions = serializers.PrimaryKeyRelatedField(queryset=Question.objects.filter(is_active=True), many=True, required=False)
+#     created_by = serializers.StringRelatedField(read_only=True)
+#     scoring_scheme = serializers.JSONField()
+#     question_filters = serializers.JSONField(default=dict)
+
+#     class Meta:
+#         model = Test
+#         fields = [
+#             'id', 'title', 'created_by', 'subject', 'questions', 'duration',
+#             'max_attempts', 'scoring_scheme', 'question_filters', 'created_at', 'updated_at'
+#         ]
+#         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+
+#     def validate(self, data):
+#         subject = data.get('subject')
+#         questions = data.get('questions', [])
+#         question_filters = data.get('question_filters', {})
+#         scoring_scheme = data.get('scoring_scheme', {})
+#         duration = data.get('duration', 10)
+
+#         if not subject:
+#             logger.warning("Test creation failed: No subjects provided")
+#             raise serializers.ValidationError({"subjects": "A subject is required"})
+
+#         if not questions and not question_filters:
+#             logger.warning("Test creation failed: No questions or filters provided")
+#             raise serializers.ValidationError({"questions": "Provide exactly 5 questions or use filters"})
+
+#         if question_filters:
+#             if 'topic' not in question_filters:
+#                 logger.warning("Test creation failed: Topic required in filters")
+#                 raise serializers.ValidationError({"question_filters": "Topic ID is required for auto-selection"})
+#             try:
+#                 topic_id = int(question_filters['topic'])
+#                 topic = Topic.objects.get(id=topic_id)
+#             except (ValueError, Topic.DoesNotExist):
+#                 logger.warning(f"Test creation failed: Invalid topic ID {question_filters.get('topic')}")
+#                 raise serializers.ValidationError({"question_filters": "Invalid topic ID"})
+
+#             queryset = Question.objects.filter(is_active=True, topics=topic)
+#             if 'difficulty' in question_filters:
+#                 if question_filters['difficulty'] not in ['E', 'M', 'H']:
+#                     raise serializers.ValidationError({"question_filters": "Invalid difficulty (E, M, H)"})
+#                 queryset = queryset.filter(difficulty=question_filters['difficulty'])
+            
+#             questions = queryset.distinct()[:5]
+#             if len(questions) < 5:
+#                 logger.warning(f"Test creation failed: Only {len(questions)} questions match filters {question_filters}")
+#                 raise serializers.ValidationError({"question_filters": f"Need 5 questions, found {len(questions)} for topic {topic.name}"})
+#             data['questions'] = questions
+
+#         if len(questions) != 5:
+#             logger.warning(f"Test creation failed: Invalid question count ({len(questions)}, expected 5)")
+#             raise serializers.ValidationError({"questions": "Test must have exactly 5 questions"})
+
+#         subject_ids = set(s.id for s in subjects)
+#         if question_filters.get('topic'):
+#             topic_id = int(question_filters['topic'])
+#             for q in questions:
+#                 q_subject_ids = set(t.subject_id for t in q.topics.all())
+#                 q_topic_ids = set(t.id for t in q.topics.all())
+#                 if not subject_ids.intersection(q_subject_ids):
+#                     logger.warning(f"Test creation failed: Question {q.id} does not belong to test subjects")
+#                     raise serializers.ValidationError({"questions": f"Question {q.id} does not belong to test subjects"})
+#                 if topic_id not in q_topic_ids:
+#                     logger.warning(f"Test creation failed: Question {q.id} does not match topic {topic_id}")
+#                     raise serializers.ValidationError({"questions": f"Question {q.id} does not match topic ID {topic_id}"})
+#         else:
+#             for q in questions:
+#                 q_subject_ids = set(t.subject_id for t in q.topics.all())
+#                 if not subject_ids.intersection(q_subject_ids):
+#                     logger.warning(f"Test creation failed: Question {q.id} does not belong to test subjects")
+#                     raise serializers.ValidationError({"questions": f"Question {q.id} does not belong to test subjects"})
+
+#         # if not isinstance(scoring_scheme, dict) or 'correct' not in scoring_scheme or 'incorrect' in scoring_scheme:
+#         #     logger.warning("Test creation failed: Invalid scoring scheme")
+#         #     raise serializers.ValidationError({"scoring_scheme": "Must include 'correct' and 'incorrect' values"})
+#         if not isinstance(scoring_scheme, dict) or 'correct' not in scoring_scheme or 'incorrect' not in scoring_scheme:
+#             logger.warning("Test creation failed: Invalid scoring scheme")
+#             raise serializers.ValidationError({"scoring_scheme": "Must include 'correct' and 'incorrect' values"})
+
+#         if duration <= 0:
+#             logger.warning(f"Test creation failed: Invalid duration {duration}")
+#             raise serializers.ValidationError({"duration": "Duration must be positive"})
+
+#         return data
+
+#     def create(self, validated_data):
+#         subjects = validated_data.pop('subjects', [])
+#         questions = validated_data.pop('questions', [])
+#         test = Test.objects.create(**validated_data)
+#         test.subjects.set(subjects)
+#         test.questions.set(questions)
+#         logger.info(f"Test {test.id} created by {test.created_by.email}")
+#         return test
+
+#     def update(self, instance, validated_data):
+#         subjects = validated_data.pop('subjects', None)
+#         questions = validated_data.pop('questions', None)
+#         for attr, value in validated_data.items():
+#             setattr(instance, attr, value)
+#         instance.save()
+#         if subjects is not None:
+#             instance.subjects.set(subjects)
+#         if questions is not None:
+#             instance.questions.set(questions)
+#         logger.info(f"Test {instance.id} ")
+#         return instance
+
+
 class TestSerializer(serializers.ModelSerializer):
-    subjects = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all(), many=True)
-    questions = serializers.PrimaryKeyRelatedField(queryset=Question.objects.filter(is_active=True), many=True, required=False)
+    subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all())
+    questions = serializers.PrimaryKeyRelatedField(many=True, queryset=Question.objects.filter(is_active=True), required=False)
     created_by = serializers.StringRelatedField(read_only=True)
     scoring_scheme = serializers.JSONField()
     question_filters = serializers.JSONField(default=dict)
@@ -20,21 +132,21 @@ class TestSerializer(serializers.ModelSerializer):
     class Meta:
         model = Test
         fields = [
-            'id', 'title', 'created_by', 'subjects', 'questions', 'duration',
+            'id', 'title', 'created_by', 'subject', 'questions', 'duration',
             'max_attempts', 'scoring_scheme', 'question_filters', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
     def validate(self, data):
-        subjects = data.get('subjects', [])
+        subject = data.get('subject')
         questions = data.get('questions', [])
         question_filters = data.get('question_filters', {})
         scoring_scheme = data.get('scoring_scheme', {})
         duration = data.get('duration', 10)
 
-        if not subjects:
-            logger.warning("Test creation failed: No subjects provided")
-            raise serializers.ValidationError({"subjects": "At least one subject is required"})
+        if not subject:
+            logger.warning("Test creation failed: No subject provided")
+            raise serializers.ValidationError({"subject": "A subject is required"})
 
         if not questions and not question_filters:
             logger.warning("Test creation failed: No questions or filters provided")
@@ -45,50 +157,62 @@ class TestSerializer(serializers.ModelSerializer):
                 logger.warning("Test creation failed: Topic required in filters")
                 raise serializers.ValidationError({"question_filters": "Topic ID is required for auto-selection"})
             try:
-                topic_id = int(question_filters['topic'])
-                topic = Topic.objects.get(id=topic_id)
+                topic_ids = question_filters.get('topic', [])
+                if not isinstance(topic_ids, list):
+                    topic_ids = [topic_ids]
+                # Convert topic_ids to integers for consistency
+                topic_ids = [int(tid) for tid in topic_ids]
+                # Update question_filters with converted topic IDs
+                data['question_filters']['topic'] = topic_ids  # Add this line
+
+                topics = Topic.objects.filter(id__in=topic_ids, subject=subject)
+                if len(topics) != len(topic_ids):
+                    logger.warning(f"Test creation failed: Invalid topic IDs {topic_ids}")
+                    raise serializers.ValidationError({"question_filters": "Invalid topic ID(s) or topics do not belong to the subject"})
             except (ValueError, Topic.DoesNotExist):
                 logger.warning(f"Test creation failed: Invalid topic ID {question_filters.get('topic')}")
                 raise serializers.ValidationError({"question_filters": "Invalid topic ID"})
 
-            queryset = Question.objects.filter(is_active=True, topics=topic)
+            queryset = Question.objects.filter(is_active=True)
+            if topic_ids:
+                queryset = queryset.filter(topics__id__in=topic_ids).distinct()
             if 'difficulty' in question_filters:
-                if question_filters['difficulty'] not in ['E', 'M', 'H']:
-                    raise serializers.ValidationError({"question_filters": "Invalid difficulty (E, M, H)"})
-                queryset = queryset.filter(difficulty=question_filters['difficulty'])
+                if question_filters['difficulty'] not in ['Easy', 'Medium', 'Hard']:
+                    raise serializers.ValidationError({"question_filters": "Invalid difficulty (Easy, Medium, Hard)"})
+                difficulty_map = {'Easy': 'E', 'Medium': 'M', 'Hard': 'H'}
+                queryset = queryset.filter(difficulty=difficulty_map[question_filters['difficulty']])
             
             questions = queryset.distinct()[:5]
             if len(questions) < 5:
                 logger.warning(f"Test creation failed: Only {len(questions)} questions match filters {question_filters}")
-                raise serializers.ValidationError({"question_filters": f"Need 5 questions, found {len(questions)} for topic {topic.name}"})
+                raise serializers.ValidationError({"question_filters": f"Need 5 questions, found {len(questions)} for topics {topic_ids}"})
             data['questions'] = questions
 
         if len(questions) != 5:
             logger.warning(f"Test creation failed: Invalid question count ({len(questions)}, expected 5)")
             raise serializers.ValidationError({"questions": "Test must have exactly 5 questions"})
 
-        subject_ids = set(s.id for s in subjects)
+        subject_id = subject.id if subject else None
         if question_filters.get('topic'):
-            topic_id = int(question_filters['topic'])
+            topic_ids = question_filters.get('topic', [])
+            if not isinstance(topic_ids, list):
+                topic_ids = [topic_ids]
             for q in questions:
                 q_subject_ids = set(t.subject_id for t in q.topics.all())
                 q_topic_ids = set(t.id for t in q.topics.all())
-                if not subject_ids.intersection(q_subject_ids):
-                    logger.warning(f"Test creation failed: Question {q.id} does not belong to test subjects")
-                    raise serializers.ValidationError({"questions": f"Question {q.id} does not belong to test subjects"})
-                if topic_id not in q_topic_ids:
-                    logger.warning(f"Test creation failed: Question {q.id} does not match topic {topic_id}")
-                    raise serializers.ValidationError({"questions": f"Question {q.id} does not match topic ID {topic_id}"})
+                if subject_id not in q_subject_ids:
+                    logger.warning(f"Test creation failed: Question {q.id} does not belong to subject {subject_id}")
+                    raise serializers.ValidationError({"questions": f"Question {q.id} does not belong to subject {subject_id}"})
+                if not any(topic_id in q_topic_ids for topic_id in topic_ids):
+                    logger.warning(f"Test creation failed: Question {q.id} does not match any topic {topic_ids}")
+                    raise serializers.ValidationError({"questions": f"Question {q.id} does not match any topic ID {topic_ids}"})
         else:
             for q in questions:
                 q_subject_ids = set(t.subject_id for t in q.topics.all())
-                if not subject_ids.intersection(q_subject_ids):
-                    logger.warning(f"Test creation failed: Question {q.id} does not belong to test subjects")
-                    raise serializers.ValidationError({"questions": f"Question {q.id} does not belong to test subjects"})
+                if subject_id not in q_subject_ids:
+                    logger.warning(f"Test creation failed: Question {q.id} does not belong to subject {subject_id}")
+                    raise serializers.ValidationError({"questions": f"Question {q.id} does not belong to subject {subject_id}"})
 
-        # if not isinstance(scoring_scheme, dict) or 'correct' not in scoring_scheme or 'incorrect' in scoring_scheme:
-        #     logger.warning("Test creation failed: Invalid scoring scheme")
-        #     raise serializers.ValidationError({"scoring_scheme": "Must include 'correct' and 'incorrect' values"})
         if not isinstance(scoring_scheme, dict) or 'correct' not in scoring_scheme or 'incorrect' not in scoring_scheme:
             logger.warning("Test creation failed: Invalid scoring scheme")
             raise serializers.ValidationError({"scoring_scheme": "Must include 'correct' and 'incorrect' values"})
@@ -100,25 +224,24 @@ class TestSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        subjects = validated_data.pop('subjects', [])
+        subject = validated_data.pop('subject')
         questions = validated_data.pop('questions', [])
-        test = Test.objects.create(**validated_data)
-        test.subjects.set(subjects)
+        test = Test.objects.create(subject=subject, **validated_data)
         test.questions.set(questions)
         logger.info(f"Test {test.id} created by {test.created_by.email}")
         return test
 
     def update(self, instance, validated_data):
-        subjects = validated_data.pop('subjects', None)
+        subject = validated_data.pop('subject', None)
         questions = validated_data.pop('questions', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        if subject is not None:
+            instance.subject = subject
         instance.save()
-        if subjects is not None:
-            instance.subjects.set(subjects)
         if questions is not None:
             instance.questions.set(questions)
-        logger.info(f"Test {instance.id} ")
+        logger.info(f"Test {instance.id} updated")
         return instance
 
 class TestAttemptSerializer(serializers.ModelSerializer):

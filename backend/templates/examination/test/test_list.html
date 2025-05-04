@@ -7,164 +7,115 @@
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 <style>
   .test-list-container {
     min-height: 100vh;
-    background: #f1f5f9;
+    background: #f8f9fa;
     padding: 2rem;
   }
+
+  /* Enhanced Sidebar Filters */
   .sidebar {
-    background: rgba(255, 255, 255, 0.9);
+    background: white;
     border-radius: 15px;
     padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
     height: fit-content;
     position: sticky;
     top: 2rem;
   }
-  .form-label {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #495057;
-  }
-  .form-select, .form-control {
-    border-radius: 8px;
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-    border: 1px solid #ced4da;
-  }
-  .btn-primary {
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
-    border: none;
-    border-radius: 8px;
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-    transition: transform 0.3s, box-shadow 0.3s;
-  }
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
-  }
-  .btn-outline-primary {
-    border-radius: 8px;
-    font-size: 0.9rem;
-    transition: transform 0.3s;
-  }
-  .btn-outline-primary:hover {
-    transform: translateY(-2px);
-  }
-  .filter-badge {
-    font-size: 0.8rem;
-    margin: 0.3rem 0.3rem 0 0;
-    cursor: pointer;
-    background: #e9ecef;
-    color: #495057;
-    border-radius: 12px;
-    padding: 0.3rem 0.6rem;
-    transition: background 0.3s;
-  }
-  .filter-badge:hover {
-    background: #d1d5db;
-  }
-  .test-card {
-    background: #fff;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    transition: transform 0.3s, box-shadow 0.3s;
-    animation: fadeIn 0.5s ease-in;
-  }
-  .test-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-  .test-card .card-body {
-    padding: 1.25rem;
-  }
-  .test-card .card-title {
+
+  .filter-section-title {
     font-size: 1.1rem;
     font-weight: 600;
-    color: #1f2a44;
-    margin-bottom: 0.5rem;
+    color: #1a1a1a;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
   }
-  .test-card .card-text {
-    font-size: 0.85rem;
-    color: #6c757d;
-    margin-bottom: 0.25rem;
+
+  /* Enhanced Test Cards */
+  .test-card {
+    background: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    overflow: hidden;
   }
-  .subject-badge {
-    background: #6f42c1;
+
+  .test-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
     color: white;
-    font-size: 0.75rem;
-    padding: 0.3rem 0.6rem;
-    border-radius: 10px;
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
-    display: inline-block;
+    padding: 1rem 1.5rem;
+    border-radius: 12px 12px 0 0;
   }
-  .action-btn {
-    width: 32px;
-    height: 32px;
+
+  .card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-metadata {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .meta-icon {
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .difficulty-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 8px;
   }
-  .pagination .page-link {
-    border-radius: 8px;
-    margin: 0 0.25rem;
-    padding: 0.5rem 1rem;
-    color: #3b82f6;
-    font-size: 0.9rem;
+
+  .badge-easy { background: #10b981; color: white; }
+  .badge-medium { background: #f59e0b; color: white; }
+  .badge-hard { background: #ef4444; color: white; }
+
+  .progress-container {
+    padding: 0 1.5rem 1.5rem;
   }
-  .pagination .page-item.active .page-link {
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
-    color: white;
-    border: none;
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e9ecef;
   }
-  .modal-content {
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  }
-  .modal-header {
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
-    color: white;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-  }
-  .modal-footer .btn {
-    border-radius: 8px;
-  }
-  .spinner-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-  }
-  .tooltip-inner {
-    background: #343a40;
-    border-radius: 0.5rem;
-    font-size: 0.8rem;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+
+  /* Responsive Design */
   @media (max-width: 768px) {
-    .sidebar {
-      position: relative;
-      top: 0;
-      margin-bottom: 2rem;
-    }
-    .test-card .card-body {
+    .test-list-container {
       padding: 1rem;
+    }
+    
+    .card-metadata {
+      grid-template-columns: 1fr;
     }
   }
 </style>
@@ -172,110 +123,218 @@
 
 {% block content %}
 <div class="test-list-container">
-  <div class="row">
-    <!-- Sidebar Filters -->
+  <div class="row g-4">
+    <!-- Enhanced Sidebar Filters -->
     <div class="col-lg-3 col-md-12">
       <div class="sidebar">
-        <h5 class="mb-3">Filter Tests</h5>
+        <h5 class="filter-section-title">Filter Tests</h5>
         <form id="filter-form" method="get" action="{% url 'test_list' %}">
-          <div class="mb-3">
-            <label for="subject-filter" class="form-label">Subject</label>
-            <select id="subject-filter" name="subject" class="form-select" data-choices='{"placeholder": true, "placeholderValue": "All Subjects"}'>
+          <!-- Subject Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Subject</label>
+            <select name="subject" class="form-select">
               <option value="">All Subjects</option>
               {% for subject in subjects %}
-                <option value="{{ subject.id }}" {% if current_filters.subject == subject.id|stringformat:"s" %}selected{% endif %}>{{ subject.name }}</option>
+              <option value="{{ subject.id }}" {% if current_filters.subject == subject.id|stringformat:"s" %}selected{% endif %}>
+                {{ subject.name }}
+              </option>
               {% endfor %}
             </select>
           </div>
-          <div class="mb-3">
-            <label for="created_after-filter" class="form-label">Created After</label>
-            <input type="date" id="created_after-filter" name="created_after" class="form-control" value="{{ current_filters.created_after|default:'' }}">
+
+          <!-- Topic Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Topic</label>
+            <select name="topic" class="form-select">
+              <option value="">All Topics</option>
+              {% for topic in topics %}
+              <option value="{{ topic.id }}" {% if current_filters.topic == topic.id|stringformat:"s" %}selected{% endif %}>
+                {{ topic.name }}
+              </option>
+              {% endfor %}
+            </select>
           </div>
-          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-filter me-2"></i>Apply Filters</button>
+
+          <!-- Difficulty Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Difficulty</label>
+            <select name="difficulty" class="form-select">
+              <option value="">All Difficulties</option>
+              <option value="Easy" {% if current_filters.difficulty == 'Easy' %}selected{% endif %}>Easy</option>
+              <option value="Medium" {% if current_filters.difficulty == 'Medium' %}selected{% endif %}>Medium</option>
+              <option value="Hard" {% if current_filters.difficulty == 'Hard' %}selected{% endif %}>Hard</option>
+            </select>
+          </div>
+
+          <!-- Date Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Created After</label>
+            <input type="date" name="created_after" class="form-control" 
+                   value="{{ current_filters.created_after|default:'' }}">
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-funnel me-2"></i>Apply Filters
+          </button>
         </form>
-        <div class="mt-3">
-          <h6 class="mb-2" style="font-size: 0.9rem; color: #495057;">Selected Filters:</h6>
-          {% if current_filters.subject %}
-            <span class="badge filter-badge" data-type="subject">{{ subjects|lookup:current_filters.subject|attr:"name" }} <i class="bi bi-x"></i></span>
-          {% endif %}
-          {% if current_filters.created_after %}
-            <span class="badge filter-badge" data-type="created_after">{{ current_filters.created_after }} <i class="bi bi-x"></i></span>
-          {% endif %}
+
+        <!-- Active Filters -->
+        <div class="mt-4">
+          <h6 class="filter-section-title">Active Filters</h6>
+          <div class="d-flex flex-wrap gap-2">
+            {% for filter, value in current_filters.items %}
+              {% if value %}
+              <span class="badge bg-secondary d-flex align-items-center gap-1">
+                {{ filter|title }}: {{ value }}
+                <button type="button" class="btn-close btn-close-white" 
+                        onclick="removeFilter('{{ filter }}')"></button>
+              </span>
+              {% endif %}
+            {% endfor %}
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Test Grid -->
+    <!-- Enhanced Test Grid -->
     <div class="col-lg-9 col-md-12">
       <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 style="color: #1f2a44; font-weight: 600;">My Tests</h3>
-        <a href="{% url 'test_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-2"></i>Create New Test</a>
+        <h2 class="h4 fw-bold mb-0">Available Tests</h2>
+        {% if request.user.role == 'TE' %}
+        <a href="{% url 'test_create' %}" class="btn btn-primary">
+          <i class="bi bi-plus-circle me-2"></i>Create New Test
+        </a>
+        {% endif %}
       </div>
-      <div class="row mb-5">
+
+      <div class="row g-4">
         {% for test in results %}
-          <div class="col-md-4 mb-4">
-            <div class="test-card">
-              <div class="card-body">
-                <h5 class="card-title">{{ test.title|truncatechars:30 }}</h5>
-                <p class="card-text mb-2">
-                  {% for subject in test.subjects.all %}
-                    <span class="badge subject-badge">{{ subject.name }}</span>
-                  {% endfor %}
-                </p>
-                <p class="card-text"><strong>Questions:</strong> {{ test.questions.count }}</p>
-                <p class="card-text"><strong>Duration:</strong> {{ test.duration }} min</p>
-                <p class="card-text"><strong>Attempts:</strong> {{ test.max_attempts }}</p>
-                <div class="d-flex gap-2 mt-2">
-                  <a href="{% url 'test_analytics' test_id=test.id %}" class="btn btn-outline-primary btn-sm action-btn" data-bs-toggle="tooltip" title="View test analytics">
-                    <i class="bi bi-bar-chart"></i>
-                  </a>
-                  <a href="{% url 'test_update' pk=test.id %}" class="btn btn-outline-primary btn-sm action-btn" data-bs-toggle="tooltip" title="Edit test">
-                    <i class="bi bi-pencil"></i>
-                  </a>
-                  <button type="button" class="btn btn-outline-danger btn-sm action-btn" data-bs-toggle="modal" data-bs-target="#deleteModal" data-test-id="{{ test.id }}" data-bs-toggle="tooltip" title="Delete test">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </div>
+        <div class="col-xxl-4 col-lg-6 col-md-12">
+          <div class="test-card">
+            <!-- Card Header -->
+            <div class="card-header">
+              <h3 class="card-title mb-0">{{ test.title }}</h3>
+              <span class="badge bg-light text-dark">{{ test.subject.name }}</span>
+            </div>
+
+            <!-- Card Metadata -->
+            <div class="card-metadata">
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+                {{ test.questions.count }} Questions
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-clock"></i>
+                </span>
+                {{ test.duration }} Minutes
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-bar-chart"></i>
+                </span>
+                {{ test.scoring_scheme.correct }}/{{ test.scoring_scheme.incorrect }} Scoring
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-lightning-charge"></i>
+                </span>
+                <span class="difficulty-badge {% if test.difficulty == 'E' %}badge-easy{% elif test.difficulty == 'M' %}badge-medium{% else %}badge-hard{% endif %}">
+                  {{ test.get_difficulty_display }}
+                </span>
               </div>
             </div>
+
+            {% comment %} <!-- Progress Bar -->
+            <div class="progress-container">
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Attempts: {{ test.attempts.count }}/{{ test.max_attempts }}</span>
+              </div>
+              <div class="progress" style="height: 6px;">
+                <div class="progress-bar bg-primary" 
+                     role="progressbar" 
+                     style="width: {{ test.attempt_percentage }}%">
+                </div>
+              </div>
+            </div> {% endcomment %}
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+              <a href="#" 
+                 class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2">
+                <i class="bi bi-eye"></i> View
+              </a>
+              {% if request.user.role == 'TE' %}
+              <a href="{% url 'test_update' test.id %}" 
+                 class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <button class="btn btn-outline-danger btn-sm delete-btn"  data-bs-toggle="modal" data-bs-target="#deleteModal"
+                      data-test-id="{{ test.id }}">
+                <i class="bi bi-trash"></i>
+              </button>
+              
+              {% else %}
+              <a href="{% url 'attempt_list' %}" 
+                 class="btn btn-primary btn-sm flex-fill">
+                <i class="bi bi-play-circle me-2"></i>Start Test
+              </a>
+              {% endif %}
+            </div>
           </div>
+        </div>
         {% empty %}
-          <div class="col-12">
-            <p class="text-muted text-center">No tests available. Try adjusting your filters or create a new test.</p>
+        <div class="col-12">
+          <div class="alert alert-info text-center">
+            <i class="bi bi-info-circle me-2"></i>
+            No tests found matching your criteria
           </div>
+        </div>
         {% endfor %}
       </div>
 
       <!-- Pagination -->
       {% if results.has_other_pages %}
-        <nav aria-label="Page navigation" class="mt-4">
-          <ul class="pagination justify-content-center">
-            {% if results.has_previous %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ results.previous_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}"><i class="bi bi-chevron-left"></i></a>
-              </li>
-            {% endif %}
-            {% for num in results.paginator.page_range %}
-              <li class="page-item {% if results.number == num %}active{% endif %}">
-                <a class="page-link" href="?page={{ num }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">{{ num }}</a>
-              </li>
-            {% endfor %}
-            {% if results.has_next %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ results.next_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}"><i class="bi bi-chevron-right"></i></a>
-              </li>
-            {% endif %}
-          </ul>
-        </nav>
-      {% endif %}
+      <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if results.has_previous %}
+          <li class="page-item">
+            <a class="page-link" 
+               href="?page={{ results.previous_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              Previous
+            </a>
+          </li>
+          {% endif %}
 
-      <!-- Action Button -->
-      <div class="text-center mt-4">
-        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-primary"><i class="bi bi-house me-2"></i>Back to Dashboard</a>
-      </div>
+          {% for num in results.paginator.page_range %}
+          <li class="page-item {% if results.number == num %}active{% endif %}">
+            <a class="page-link" 
+               href="?page={{ num }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              {{ num }}
+            </a>
+          </li>
+          {% endfor %}
+
+          {% if results.has_next %}
+          <li class="page-item">
+            <a class="page-link" 
+               href="?page={{ results.next_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              Next
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
     </div>
   </div>
 </div>
+
 
 <!-- Delete Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">

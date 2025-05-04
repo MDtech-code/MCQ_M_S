@@ -17,6 +17,6 @@ class TestAnalyticsAdmin(admin.ModelAdmin):
 @admin.register(TestAttemptHistory)
 class TestAttemptHistoryAdmin(admin.ModelAdmin):
     list_display = ('student', 'test', 'score', 'completed_at', 'duration')
-    list_filter = ('completed_at', 'test__subjects')
+    list_filter = ('completed_at', 'test__subject')
     search_fields = ('student__email', 'test__title')
     readonly_fields = ('completed_at',)

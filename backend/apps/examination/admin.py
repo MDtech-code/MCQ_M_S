@@ -7,7 +7,7 @@ class TestAdmin(admin.ModelAdmin):
     list_display = ('id','title', 'created_by', 'duration', 'max_attempts', 'created_at')
     search_fields = ('title', 'created_by__email')
     list_filter = ( 'created_by', 'created_at')
-    raw_id_fields = ('created_by', 'subjects')
+    raw_id_fields = ('created_by', 'subject')
     
 
 @admin.register(TestAttempt)

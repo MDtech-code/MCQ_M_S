@@ -42,16 +42,18 @@ class QuestionCreateView(APIView):
                 'difficulty': '',
                 'options': {'A': '', 'B': '', 'C': '', 'D': ''},
                 'correct_answer': '',
-                'metadata': '{}'
+                'metadata': '{}',
+                
             }
 
             return Response(
                 {
                     'subjects': subjects,
                     'topics': topics,
-                    'form_data': initial_form_data
+                    'form_data': initial_form_data,
+                    'is_update': False,
                 },
-                template_name='content/teacher/question_create.html'
+                template_name='content/teacher/question_form.html'
             )
 
         return Response({"message": "Question creation endpoint (GET)"}, status=status.HTTP_200_OK)
@@ -119,167 +121,15 @@ class QuestionCreateView(APIView):
                     'errors': serializer.errors,
                     'form_data': request.data,
                     'subjects': subjects,
-                    'topics': topics
+                    'topics': topics,
+                    'is_update': False,
                 },
-                template_name='content/teacher/question_create.html',
+                template_name='content/teacher/question_form.html',
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# @method_decorator(ensure_csrf_cookie, name='dispatch')
-# class QuestionCreateView(APIView):
 
-#     permission_classes = [permissions.IsAuthenticated, IsTeacher]
-#     renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
-#     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-#     throttle_classes = [CustomUserRateThrottle]
-
-#     def get(self, request):
-#         if request.accepted_renderer.format == 'html':
-#             subjects = Subject.objects.all()
-#             topics= Topic.objects.all()
-            
-#             initial_form_data = {
-#                 'question_type': 'MCQ',
-#                 'topics': [],
-#                 'question_text': '',
-#                 'difficulty': '',
-#                 'options': {'A': '', 'B': '', 'C': '', 'D': ''},
-#                 'correct_answer': '',
-#                 'metadata': '{}'
-#             }
-
-#             return Response(
-#                 {'subjects': subjects, 'topics': topics,'form_data': initial_form_data },
-#                 template_name='content/teacher/question_create.html'
-#             )
-#         return Response({"message": "Question creation endpoint (GET)"}, status=status.HTTP_200_OK)
-
-#     def post(self, request):
-#         # Preprocess form data for HTML requests
-#         data = request.data.copy()  # Create a mutable copy
-#         if request.accepted_renderer.format == 'html':
-#             # Combine options.A, options.B, etc., into options dictionary
-#             options = {
-#                 'A': data.get('options.A', '').strip(),
-#                 'B': data.get('options.B', '').strip(),
-#                 'C': data.get('options.C', '').strip(),
-#                 'D': data.get('options.D', '').strip(),
-#             }
-#             data['options'] = json.dumps(options)
-
-#             # Convert topics to a list
-#             topics = data.getlist('topics') if hasattr(data, 'getlist') else data.get('topics')
-#             if isinstance(topics, str):
-#                 data['topics'] = [int(topics)]
-#             elif isinstance(topics, list):
-#                 data['topics'] = [int(t) for t in topics]
-
-
-#             # Handle metadata
-#             metadata = data.get('metadata', '').strip()
-#             try:
-#                 data['metadata'] = json.loads(metadata) if metadata else {}
-#             except json.JSONDecodeError:
-#                 data['metadata'] = {}
-
-#         logger.debug(f"Processed data: {data}")
-
-#         serializer = QuestionSerializer(data=data, context={'request': request})
-#         if serializer.is_valid():
-#             question = serializer.save()
-#             send_question_notification_task.delay(
-#                 question.id, request.user.email, action="created"
-#             )
-#             if question.approval.flagged_by_system:
-#                 notify_admin_approval_task.delay(question.id, question.approval.flag_reason)
-#             logger.info(f"Question {question.id} created by {request.user.email}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.success(request, "Question created successfully.")
-#                 return redirect('question_list')
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-#         logger.warning(f"Question creation failed for {request.user.email}: {serializer.errors}")
-#         if request.accepted_renderer.format == 'html':
-#             subjects = Subject.objects.all()
-#             topics = Topic.objects.all()
-            
-#             return Response(
-#                 {
-#                     'errors': serializer.errors,
-#                     'form_data': request.data,
-#                     'subjects': subjects,
-#                     'topics': topics
-#                 },
-#                 template_name='content/teacher/question_create.html',
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-#@method_decorator(ensure_csrf_cookie, name='dispatch')
-# class QuestionCreateView(APIView):
-#     permission_classes = [permissions.IsAuthenticated, IsTeacher]
-#     renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
-#     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-#     throttle_classes = [CustomUserRateThrottle]
-
-
-#     def get(self, request):
-#         if request.accepted_renderer.format == 'html':
-#             # Provide subjects and topics for form
-#             subjects = Subject.objects.all()
-#             topics = Topic.objects.all()
-#             return Response(
-#                 {'subjects': subjects, 'topics': topics},
-#                 template_name='content/teacher/question_create.html'
-#             )
-#         return Response({"message": "Question creation endpoint (GET)"}, status=status.HTTP_200_OK)
-
-#     def post(self, request):
-#         print(request.data)
-#         if not request.user.is_active or not request.user.is_verified:
-#             logger.warning(f"Inactive/unverified teacher {request.user.email} attempted to create question")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.error(request, "Your account is not active or verified.")
-#                 return redirect('public:teacher_dashboard')
-#             return Response(
-#                 {"error": "Account not active or verified"},
-#                 status=status.HTTP_403_FORBIDDEN
-#             )
-        
-
-
-
-#         serializer = QuestionSerializer(data=request.data, context={'request': request})
-#         if serializer.is_valid():
-            
-#             question = serializer.save()
-#             send_question_notification_task.delay(
-#                 question.id, request.user.email, action="created"
-#             )
-#             if question.approval.flagged_by_system:
-#                 notify_admin_approval_task.delay(question.id, question.approval.flag_reason)
-#             logger.info(f"Question {question.id} created by {request.user.email}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.success(request, "Question created successfully.")
-#                 return redirect('question_list')
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         logger.warning(f"Question creation failed for {request.user.email}: {serializer.errors}")
-#         if request.accepted_renderer.format == 'html':
-#             subjects = Subject.objects.all()
-#             topics = Topic.objects.all()
-#             return Response(
-#                 {
-#                     'errors': serializer.errors,
-#                     'form_data': request.data,
-#                     'subjects': subjects,
-#                     'topics': topics
-#                 },
-#                 template_name='content/teacher/question_create.html',
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#         else:
-#             print("Validation error:", serializer.errors)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     
 @method_decorator(ensure_csrf_cookie, name='dispatch')
@@ -404,115 +254,7 @@ class QuestionListView(APIView):
             "count": paginator.count,
             "results": serializer.data
         })
-# class QuestionListView(APIView):
-#     permission_classes = [permissions.IsAuthenticated]
-#     authentication_classes = [CookieTokenAuthentication]
-#     throttle_classes = [CustomUserRateThrottle]
 
-#     def get(self, request):
-#         if not request.user.is_active:
-#             logger.warning(f"Inactive user {request.user.email} attempted to list questions")
-#             return Response({"error": "Inactive account"}, status=status.HTTP_403_FORBIDDEN)
-        
-#         # Role-based queryset
-#         if request.user.role == User.Role.STUDENT:
-#             queryset = Question.objects.filter(is_active=True).select_related('created_by')
-#         elif request.user.role == User.Role.TEACHER:
-#             queryset = Question.objects.filter(created_by=request.user).select_related('created_by')
-#         else:
-#             logger.warning(f"Invalid role {request.user.role} for {request.user.email}")
-#             return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
-
-#         # Filters
-#         difficulty = request.query_params.get('difficulty')
-#         subject_id = request.query_params.get('subject')
-#         topic_id = request.query_params.get('topic')
-#         status = request.query_params.get('status')  # Teacher only
-#         created_after = request.query_params.get('created_after')
-
-#         if difficulty and difficulty not in ['E', 'M', 'H']:
-#             logger.warning(f"Invalid difficulty filter: {difficulty}")
-#             return Response({"error": "Difficulty must be E, M, or H"}, status=status.HTTP_400_BAD_REQUEST)
-#         if difficulty:
-#             queryset = queryset.filter(difficulty=difficulty)
-
-#         if subject_id:
-#             try:
-#                 Subject.objects.get(id=subject_id)
-#                 queryset = queryset.filter(topics__subject_id=subject_id)
-#             except Subject.DoesNotExist:
-#                 logger.warning(f"Invalid subject_id: {subject_id}")
-#                 return Response({"error": "Subject not found"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         if topic_id:
-#             try:
-#                 topic = Topic.objects.get(id=topic_id)
-#                 if subject_id and topic.subject_id != int(subject_id):
-#                     logger.warning(f"Topic {topic_id} does not belong to subject {subject_id}")
-#                     return Response({"error": "Topic does not belong to specified subject"}, status=status.HTTP_400_BAD_REQUEST)
-#                 queryset = queryset.filter(topics__id=topic_id)
-#             except Topic.DoesNotExist:
-#                 logger.warning(f"Invalid topic_id: {topic_id}")
-#                 return Response({"error": "Topic not found"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         if status and request.user.role == User.Role.TEACHER:
-#             if status not in ['PENDING', 'APPROVED', 'REJECTED']:
-#                 logger.warning(f"Invalid status filter: {status}")
-#                 return Response({"error": "Status must be PENDING, APPROVED, or REJECTED"}, status=status.HTTP_400_BAD_REQUEST)
-#             queryset = queryset.filter(approval__status=status)
-
-#         if created_after:
-#             try:
-#                 queryset = queryset.filter(created_at__gte=created_after)
-#             except ValueError:
-#                 logger.warning(f"Invalid created_after: {created_after}")
-#                 return Response({"error": "Invalid date format for created_after"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         # Pagination
-#         paginator = Paginator(queryset.distinct(), 20)
-#         page = request.query_params.get('page', 1)
-#         try:
-#             questions = paginator.page(page)
-#         except EmptyPage:
-#             logger.warning(f"Invalid page {page} for question list by {request.user.email}")
-#             return Response({"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND)
-
-#         serializer = QuestionSerializer(questions, many=True)
-#         logger.info(f"Question list retrieved by {request.user.email} (role: {request.user.role})")
-#         return Response({
-#             "count": paginator.count,
-#             "results": serializer.data
-#         })
-
-
-# class QuestionUpdateView(APIView):
-#     permission_classes = [permissions.IsAuthenticated, IsTeacher]
-#     authentication_classes = [CookieTokenAuthentication]
-#     throttle_classes = [CustomUserRateThrottle]
-
-#     def put(self, request, pk):
-#         if not request.user.is_active or not request.user.is_verified:
-#             logger.warning(f"Inactive/unverified teacher {request.user.email} attempted to update question {pk}")
-#             return Response({"error": "Account not active or verified"}, status=status.HTTP_403_FORBIDDEN)
-        
-#         try:
-#             question = Question.objects.get(pk=pk, created_by=request.user)
-#         except Question.DoesNotExist:
-#             logger.warning(f"Question {pk} not found or not owned by {request.user.email}")
-#             return Response({"error": "Question not found or not owned by you"}, status=status.HTTP_404_NOT_FOUND)
-
-#         serializer = QuestionSerializer(question, data=request.data, context={'request': request})
-#         if serializer.is_valid():
-#             updated_question = serializer.save()
-#             send_question_notification_task.delay(
-#                 updated_question.id, request.user.email, action="updated"
-#             )
-#             flag_reason = updated_question.approval.flag_reason if updated_question.approval.flagged_by_system else "Question updated"
-#             notify_admin_approval_task.delay(updated_question.id, flag_reason)
-#             logger.info(f"Question {updated_question.id} updated by {request.user.email}")
-#             return Response(serializer.data, status=status.HTTP_200_OK)
-#         logger.warning(f"Question update failed for {request.user.email}: {serializer.errors}")
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class QuestionUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTeacher]
@@ -533,16 +275,17 @@ class QuestionUpdateView(APIView):
                 'difficulty': serializer.data['difficulty'],
                 'options': serializer.data['options'],
                 'correct_answer': serializer.data['correct_answer'],
-                'metadata': json.dumps(serializer.data['metadata']) if serializer.data['metadata'] else '{}'
+                'metadata': json.dumps(serializer.data['metadata']) if serializer.data['metadata'] else '{}',
             }
             return Response(
                 {
                     'subjects': subjects,
                     'topics': topics,
                     'form_data': initial_form_data,
-                    'question': question
+                    'question': question,
+                    'is_update': True,
                 },
-                template_name='content/teacher/question_update.html'
+                template_name='content/teacher/question_form.html'
             )
         return Response(QuestionSerializer(question).data, status=status.HTTP_200_OK)
 
@@ -617,138 +360,14 @@ class QuestionUpdateView(APIView):
                     'form_data': form_data,
                     'subjects': subjects,
                     'topics': topics,
-                    'question': question
+                    'question': question,
+                    'is_update': True,
                 },
-                template_name='content/teacher/question_update.html',
+                template_name='content/teacher/question_form.html',
                 status=status.HTTP_400_BAD_REQUEST
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# @method_decorator(ensure_csrf_cookie, name='dispatch')
-# class QuestionUpdateView(APIView):
-#     permission_classes = [permissions.IsAuthenticated, IsTeacher]
-#     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-#     renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
-#     throttle_classes = [CustomUserRateThrottle]
 
-#     def get(self, request, pk):
-#         if not request.user.is_active or not request.user.is_verified:
-#             logger.warning(f"Inactive/unverified teacher {request.user.email} attempted to update question {pk}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.error(request, "Your account is not active or verified.")
-#                 return redirect('public:teacher_dashboard')
-#             return Response(
-#                 {"error": "Account not active or verified"},
-#                 status=status.HTTP_403_FORBIDDEN
-#             )
-
-#         try:
-#             question = Question.objects.get(pk=pk, created_by=request.user)
-#         except Question.DoesNotExist:
-#             logger.warning(f"Question {pk} not found or not owned by {request.user.email}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.error(request, "Question not found or not owned by you.")
-#                 return redirect('question_list')
-#             return Response(
-#                 {"error": "Question not found or not owned by you"},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-
-#         serializer = QuestionSerializer(question)
-#         if request.accepted_renderer.format == 'html':
-#             subjects = Subject.objects.all()
-#             topics = Topic.objects.all()
-#             return Response(
-#                 {
-#                     'question': question,
-#                     'form_data': serializer.data,
-#                     'subjects': subjects,
-#                     'topics': topics
-#                 },
-#                 template_name='content/teacher/question_update.html'
-#             )
-#         return Response(serializer.data)
-
-#     def put(self, request, pk):
-#         if not request.user.is_active or not request.user.is_verified:
-#             logger.warning(f"Inactive/unverified teacher {request.user.email} attempted to update question {pk}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.error(request, "Your account is not active or verified.")
-#                 return redirect('public:teacher_dashboard')
-#             return Response(
-#                 {"error": "Account not active or verified"},
-#                 status=status.HTTP_403_FORBIDDEN
-#             )
-
-#         try:
-#             question = Question.objects.get(pk=pk, created_by=request.user)
-#         except Question.DoesNotExist:
-#             logger.warning(f"Question {pk} not found or not owned by {request.user.email}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.error(request, "Question not found or not owned by you.")
-#                 return redirect('question_list')
-#             return Response(
-#                 {"error": "Question not found or not owned by you"},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-
-#         serializer = QuestionSerializer(question, data=request.data, context={'request': request})
-#         if serializer.is_valid():
-#             updated_question = serializer.save()
-#             send_question_notification_task.delay(
-#                 updated_question.id, request.user.email, action="updated"
-#             )
-#             flag_reason = updated_question.approval.flag_reason if updated_question.approval.flagged_by_system else "Question updated"
-#             notify_admin_approval_task.delay(updated_question.id, flag_reason)
-#             logger.info(f"Question {updated_question.id} updated by {request.user.email}")
-
-#             if request.accepted_renderer.format == 'html':
-#                 messages.success(request, "Question updated successfully.")
-#                 return redirect('question_list')
-#             return Response(serializer.data, status=status.HTTP_200_OK)
-
-#         logger.warning(f"Question update failed for {request.user.email}: {serializer.errors}")
-#         if request.accepted_renderer.format == 'html':
-#             subjects = Subject.objects.all()
-#             topics = Topic.objects.all()
-#             return Response(
-#                 {
-#                     'errors': serializer.errors,
-#                     'form_data': request.data,
-#                     'subjects': subjects,
-#                     'topics': topics,
-#                     'question': question
-#                 },
-#                 template_name='content/teacher/question_update.html',
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# class QuestionDeleteView(APIView):
-#     permission_classes = [permissions.IsAuthenticated, IsTeacher]
-#     authentication_classes = [CookieTokenAuthentication]
-#     throttle_classes = [CustomUserRateThrottle]
-
-#     def delete(self, request, pk):
-#         if not request.user.is_active or not request.user.is_verified:
-#             logger.warning(f"Inactive/unverified teacher {request.user.email} attempted to delete question {pk}")
-#             return Response({"error": "Account not active or verified"}, status=status.HTTP_403_FORBIDDEN)
-        
-#         try:
-#             question = Question.objects.get(pk=pk, created_by=request.user)
-#         except Question.DoesNotExist:
-#             logger.warning(f"Question {pk} not found or not owned by {request.user.email}")
-#             return Response({"error": "Question not found or not owned by you"}, status=status.HTTP_404_NOT_FOUND)
-
-#         if question.approval.status == 'APPROVED':
-#             logger.warning(f"Attempt to delete approved question {pk} by {request.user.email}")
-#             return Response({"error": "Cannot delete approved questions"}, status=status.HTTP_403_FORBIDDEN)
-
-#         question.delete()  # Cascades to QuestionApproval
-#         send_question_notification_task.delay(
-#             pk, request.user.email, action="deleted"
-#         )
-#         logger.info(f"Question {pk} deleted by {request.user.email}")
-#         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 
