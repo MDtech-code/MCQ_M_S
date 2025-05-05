@@ -23,7 +23,8 @@ from rest_framework.authentication import SessionAuthentication
 from django.core.paginator import Paginator, EmptyPage
 import json
 import logging
-from django.db.models import Q
+from django.db.models import Q, F, Count
+from django.db import models
 logger = logging.getLogger(__name__)
 
 
@@ -1255,8 +1256,116 @@ class TestDeleteView(APIView):
 #         test.delete()
 #         logger.info(f"Test {pk} deleted by {request.user.email}")
 #         return Response(status=status.HTTP_204_NO_CONTENT)
+@method_decorator(ensure_csrf_cookie, name='dispatch')
+class TestListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
+    renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
+    throttle_classes = [CustomUserRateThrottle]
 
+    def get(self, request):
+        logger.info(f"TestListView accessed by {request.user.email} (role: {request.user.role})")
 
+        if not request.user.is_active:
+            logger.warning(f"Inactive user {request.user.email} attempted to list tests")
+            if request.accepted_renderer.format == 'html':
+                messages.error(request, "Your account is inactive.")
+                return redirect('dashboard')
+            return Response({"error": "Inactive account"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Queryset based on role
+        if request.user.role == 'TE':
+            base_query = Test.objects.filter(created_by=request.user).prefetch_related('attempts')
+        elif request.user.role == 'ST':
+            # base_query = Test.objects.all().prefetch_related('attempts', 'attempts__student').filter(attempts__student=request.user)
+            base_query = (Test.objects.annotate(attempt_count=Count('attempts', filter=models.Q(attempts__student=request.user))).filter(attempt_count__lt=F('max_attempts')))  
+
+        else:
+            logger.warning(f"Unauthorized role: {request.user.role}")
+            if request.accepted_renderer.format == 'html':
+                messages.error(request, "Invalid user role.")
+                return redirect('dashboard')
+            return Response({"error": "Invalid user role"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Initialize filter Q objects
+        filters = Q()
+        question_filters = Q()
+
+        # Subject filter (direct on Test model)
+        if subject_id := request.query_params.get('subject'):
+            try:
+                filters &= Q(subject__id=subject_id)
+            except ValueError:
+                logger.error(f"Invalid subject ID: {subject_id}")
+                if request.accepted_renderer.format == 'html':
+                    messages.error(request, "Invalid subject ID.")
+                    return redirect('test_list')
+                return Response({"error": "Invalid subject ID"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Topic filter (through questions)
+        if topic_id := request.query_params.get('topic'):
+            try:
+                question_filters &= Q(topics__id=topic_id)
+            except ValueError:
+                logger.error(f"Invalid topic ID: {topic_id}")
+
+        # Difficulty filter (through questions)
+        if difficulty := request.query_params.get('difficulty'):
+            difficulty_map = {'Easy': 'E', 'Medium': 'M', 'Hard': 'H'}
+            if mapped_diff := difficulty_map.get(difficulty):
+                question_filters &= Q(difficulty=mapped_diff)
+
+        # Date filter
+        if created_after := request.query_params.get('created_after'):
+            try:
+                filters &= Q(created_at__gte=parse_date(created_after))
+            except (ValueError, TypeError):
+                logger.error(f"Invalid date format: {created_after}")
+
+        # Apply question-related filters through questions relationship
+        if question_filters:
+            filters &= Q(questions__in=Question.objects.filter(question_filters))
+
+        # Final queryset with distinct results
+        queryset = base_query.filter(filters).distinct()
+
+        logger.debug(f"Final queryset for {request.user.email}: {queryset.values('id', 'title', 'duration')}")
+
+        # Pagination for HTML
+        if request.accepted_renderer.format == 'html':
+            paginator = Paginator(queryset, 20)
+            page = request.query_params.get('page', 1)
+            
+            try:
+                tests = paginator.page(page)
+            except EmptyPage:
+                logger.warning(f"Invalid page {page} for test list by {request.user.email}")
+                messages.error(request, "Page not found.")
+                return redirect('test_list')
+
+            # Get filter options
+            subjects = Subject.objects.all()
+            topics = Topic.objects.all()
+            difficulties = ['Easy', 'Medium', 'Hard']
+
+            template_name = 'examination/test/test_list.html'
+            
+            return Response(
+                {
+                    'count': paginator.count,
+                    'results': tests,
+                    'subjects': subjects,
+                    'topics': topics,
+                    'difficulties': difficulties,
+                    'current_filters': request.query_params.dict()
+                },
+                template_name=template_name
+            )
+
+        # JSON response
+        serializer = TestSerializer(queryset, many=True)
+        return Response(serializer.data)
+'''
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class TestListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1364,6 +1473,7 @@ class TestListView(APIView):
         # JSON response
         serializer = TestSerializer(queryset, many=True)
         return Response(serializer.data)
+'''
 # @method_decorator(ensure_csrf_cookie, name='dispatch')
 # class TestListView(APIView):
 #     permission_classes = [permissions.IsAuthenticated]
@@ -1538,6 +1648,62 @@ class TestListView(APIView):
 
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
+class TestDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
+    renderer_classes = [JSONRenderer]
+
+    def get(self, request, pk):
+        logger.info(f"TestDetailView accessed by {request.user.email} (role: {request.user.role}) for test {pk}")
+
+        if not request.user.is_active:
+            logger.warning(f"Inactive user {request.user.email} attempted to view test {pk}")
+            return Response({"error": "Inactive account"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            test = Test.objects.get(pk=pk)
+        except Test.DoesNotExist:
+            logger.warning(f"Test {pk} not found for {request.user.email}")
+            return Response({"error": "Test not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Role-based access control
+        if request.user.role == 'TE' and test.created_by != request.user:
+            logger.warning(f"Teacher {request.user.email} attempted to access test {pk} not created by them")
+            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Prepare test details
+        serializer = TestSerializer(test)
+        data = serializer.data
+        data['difficulty_display'] = test.get_difficulty_display()
+
+        # Add topics (from question_filters or questions)
+        topic_ids = test.question_filters.get('topic', [])
+        if isinstance(topic_ids, str):
+            topic_ids = [topic_ids]
+        try:
+            topics = Topic.objects.filter(id__in=topic_ids).values('id', 'name')
+            data['topics'] = list(topics)
+        except ValueError:
+            data['topics'] = []
+
+        # Add attempt history for students
+        if request.user.role == 'ST':
+            attempts = TestAttempt.objects.filter(test=test, student=request.user).order_by('-end_time')
+            data['attempts'] = [
+                {
+                    'id': attempt.id,
+                    'score': attempt.score,
+                    'max_score': test.questions.count() * test.scoring_scheme.get('correct', 1),
+                    'end_time': attempt.end_time,
+                    'attempt_number': i + 1
+                } for i, attempt in enumerate(attempts)
+            ]
+            data['attempts_remaining'] = max(0, test.max_attempts - len(attempts))
+
+        logger.debug(f"Test details for {request.user.email}: {data}")
+        return Response(data)
+
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class TestAttemptView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
@@ -1614,6 +1780,7 @@ class TestAttemptView(APIView):
             attempt.end_time = deadline
             attempt.calculate_score()
             attempt.save()
+            logger.info(f"Attempt {attempt.id} submitted by {request.user.email} with score {attempt.score}")
             return Response(
                 {"error": "Test duration expired", "score": attempt.score},
                 status=status.HTTP_400_BAD_REQUEST

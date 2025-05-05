@@ -58,8 +58,8 @@ class Test(TimeStampedModel):
         return self.title
 
 class TestAttempt(TimeStampedModel):
-    student = models.ForeignKey('accounts.User', on_delete=models.CASCADE)
-    test = models.ForeignKey(Test, on_delete=models.CASCADE)
+    student = models.ForeignKey('accounts.User', on_delete=models.CASCADE,related_name='attempts')
+    test = models.ForeignKey(Test, on_delete=models.CASCADE, related_name='attempts')
     start_time = models.DateTimeField()
     end_time = models.DateTimeField(null=True, blank=True)
     score = models.FloatField(null=True, blank=True)
@@ -87,18 +87,22 @@ class TestAttempt(TimeStampedModel):
             raise ValidationError(f"End time exceeds test duration of {self.test.duration} minutes.")
         
 
-
     def calculate_score(self):
-        responses = self.studentresponse_set.all()
-        score = 0
-        for response in responses:
-            if response.is_correct:
-                score += self.test.scoring_scheme.get('correct', 1)
-            else:
-                score += self.test.scoring_scheme.get('incorrect', 0)
-        self.score = score
-        self.save()
-        return score
+        responses = StudentResponse.objects.filter(attempt=self)
+        correct_count = responses.filter(is_correct=True).count()
+        scoring_scheme = self.test.scoring_scheme or {'correct': 1, 'incorrect': 0}
+        self.score = correct_count * scoring_scheme['correct']
+    # def calculate_score(self):
+    #     responses = self.studentresponse_set.all()
+    #     score = 0
+    #     for response in responses:
+    #         if response.is_correct:
+    #             score += self.test.scoring_scheme.get('correct', 1)
+    #         else:
+    #             score += self.test.scoring_scheme.get('incorrect', 0)
+    #     self.score = score
+    #     self.save()
+    #     return score
     
     def __str__(self):
         return f"{self.student.email} - {self.test.title}"

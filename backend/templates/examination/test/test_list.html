@@ -12,6 +12,1082 @@
   .test-list-container {
     min-height: 100vh;
     background: #f8f9fa;
+    padding: 3rem 2rem;
+  }
+
+  .sidebar {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    height: fit-content;
+    position: sticky;
+    top: 2rem;
+  }
+
+  .filter-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+  }
+
+  .test-card {
+    background: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  .test-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-metadata {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .meta-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .difficulty-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 8px;
+  }
+
+  .badge-easy { background: #10b981; color: white; }
+  .badge-medium { background: #f59e0b; color: white; }
+  .badge-hard { background: #ef4444; color: white; }
+
+  .progress-container {
+    padding: 0 1.5rem 1.5rem;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e9ecef;
+  }
+
+  .modal-content {
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+
+  .modal-header {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: white;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+  }
+
+  @media (max-width: 768px) {
+    .test-list-container {
+      padding: 2rem 1rem;
+    }
+    
+    .card-metadata {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="test-list-container">
+  <div class="row g-4">
+    <!-- Enhanced Sidebar Filters -->
+    <div class="col-lg-3 col-md-12">
+      <div class="sidebar">
+        <h5 class="filter-section-title">Filter Tests</h5>
+        <form id="filter-form" method="get" action="{% url 'test_list' %}">
+          <!-- Subject Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Subject</label>
+            <select name="subject" class="form-select" id="subject-filter">
+              <option value="">All Subjects</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" {% if current_filters.subject == subject.id|stringformat:"s" %}selected{% endif %}>
+                {{ subject.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Topic Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Topic</label>
+            <select name="topic" class="form-select" id="topic-filter">
+              <option value="">All Topics</option>
+              {% for topic in topics %}
+              <option value="{{ topic.id }}" {% if current_filters.topic == topic.id|stringformat:"s" %}selected{% endif %}>
+                {{ topic.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Difficulty Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Difficulty</label>
+            <select name="difficulty" class="form-select" id="difficulty-filter">
+              <option value="">All Difficulties</option>
+              <option value="Easy" {% if current_filters.difficulty == 'Easy' %}selected{% endif %}>Easy</option>
+              <option value="Medium" {% if current_filters.difficulty == 'Medium' %}selected{% endif %}>Medium</option>
+              <option value="Hard" {% if current_filters.difficulty == 'Hard' %}selected{% endif %}>Hard</option>
+            </select>
+          </div>
+
+          <!-- Date Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Created After</label>
+            <input type="date" name="created_after" class="form-control" id="created_after-filter"
+                   value="{{ current_filters.created_after|default:'' }}">
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-funnel me-2"></i>Apply Filters
+          </button>
+        </form>
+
+        <!-- Active Filters -->
+        <div class="mt-4">
+          <h6 class="filter-section-title">Active Filters</h6>
+          <div class="d-flex flex-wrap gap-2">
+            {% for filter, value in current_filters.items %}
+              {% if value %}
+              <span class="badge bg-secondary d-flex align-items-center gap-1 filter-badge" data-type="{{ filter }}">
+                {{ filter|title }}: {{ value }}
+                <button type="button" class="btn-close btn-close-white" 
+                        onclick="removeFilter('{{ filter }}')"></button>
+              </span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Enhanced Test Grid -->
+    <div class="col-lg-9 col-md-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h4 fw-bold mb-0">Available Tests</h2>
+        {% if request.user.role == 'TE' %}
+        <a href="{% url 'test_create' %}" class="btn btn-primary">
+          <i class="bi bi-plus-circle me-2"></i>Create New Test
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="row g-4">
+        {% for test in results %}
+        <div class="col-xxl-4 col-lg-6 col-md-12">
+          <div class="test-card">
+            <!-- Card Header -->
+            <div class="card-header">
+              <h3 class="card-title mb-0">{{ test.title }}</h3>
+              <span class="badge bg-light text-dark">{{ test.subject.name }}</span>
+            </div>
+
+            <!-- Card Metadata -->
+            <div class="card-metadata">
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+                {{ test.questions.count }} Questions
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-clock"></i>
+                </span>
+                {{ test.duration }} Minutes
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-bar-chart"></i>
+                </span>
+                {{ test.scoring_scheme.correct }}/{{ test.scoring_scheme.incorrect }} Scoring
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-lightning-charge"></i>
+                </span>
+                <span class="difficulty-badge {% if test.difficulty == 'E' %}badge-easy{% elif test.difficulty == 'M' %}badge-medium{% else %}badge-hard{% endif %}">
+                  {{ test.get_difficulty_display }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Attempts: {{ test.attempts.count }}/{{ test.max_attempts }}</span>
+              </div>
+              <div class="progress" style="height: 6px;">
+                <div class="progress-bar bg-primary" 
+                     role="progressbar" 
+                     style="width: {{ test.attempt_percentage }}%">
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+              <button class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 view-test-btn" 
+                      data-bs-toggle="modal" data-bs-target="#viewTestModal" data-test-id="{{ test.id }}">
+                <i class="bi bi-eye"></i> View
+              </button>
+              {% if request.user.role == 'TE' %}
+              <a href="{% url 'test_update' test.id %}" 
+                 class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <a href="{% url 'test_analytics' test.id %}" class="btn btn-outline-primary btn-sm" title="View Analytics">
+      <i class="bi bi-bar-chart"></i>
+    </a>
+              <button class="btn btn-outline-danger btn-sm delete-btn" data-bs-toggle="modal" data-bs-target="#deleteModal"
+                      data-test-id="{{ test.id }}">
+                <i class="bi bi-trash"></i>
+              </button>
+              {% else %}
+              <form method="post" action="{% url 'attempt_list' %}" class="start-test-form">
+                {% csrf_token %}
+                <input type="hidden" name="test" value="{{ test.id }}">
+                <button type="submit" class="btn btn-primary btn-sm flex-fill">
+                  <i class="bi bi-play-circle me-2"></i>Start Test
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+          <div class="alert alert-info text-center">
+            <i class="bi bi-info-circle me-2"></i>
+            No tests found matching your criteria
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if results.has_other_pages %}
+      <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if results.has_previous %}
+          <li class="page-item">
+            <a class="page-link" 
+               href="?page={{ results.previous_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              Previous
+            </a>
+          </li>
+          {% endif %}
+
+          {% for num in results.paginator.page_range %}
+          <li class="page-item {% if results.number == num %}active{% endif %}">
+            <a class="page-link" 
+               href="?page={{ num }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              {{ num }}
+            </a>
+          </li>
+          {% endfor %}
+
+          {% if results.has_next %}
+          <li class="page-item">
+            <a class="page-link" 
+               href="?page={{ results.next_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              Next
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to delete this test? This action cannot be undone.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="post" action="">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-2"></i>Delete</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View Test Modal -->
+<div class="modal fade" id="viewTestModal" tabindex="-1" aria-labelledby="viewTestModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="viewTestModalLabel">Test Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-center text-muted" id="test-details-loading">Loading test details...</div>
+        <div id="test-details-content" style="display: none;">
+          <h4 id="test-title" class="mb-3"></h4>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <p><strong>Subject:</strong> <span id="test-subject"></span></p>
+              <p><strong>Duration:</strong> <span id="test-duration"></span> minutes</p>
+              <p><strong>Questions:</strong> <span id="test-questions"></span></p>
+              <p><strong>Difficulty:</strong> <span id="test-difficulty"></span></p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Scoring:</strong> Correct: <span id="test-scoring-correct"></span>, Incorrect: <span id="test-scoring-incorrect"></span></p>
+              <p><strong>Max Attempts:</strong> <span id="test-max-attempts"></span></p>
+              <p><strong>Created By:</strong> <span id="test-created-by"></span></p>
+              <p><strong>Topics:</strong> <span id="test-topics"></span></p>
+            </div>
+          </div>
+          <div class="mt-4" id="test-attempts-section">
+            <h5>Attempt History</h5>
+            <div id="test-attempts"></div>
+            <p><strong>Attempts Remaining:</strong> <span id="test-attempts-remaining"></span></p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <form method="post" action="{% url 'attempt_list' %}" class="start-test-form" id="modal-start-test-form">
+          {% csrf_token %}
+          <input type="hidden" name="test" id="modal-test-id">
+          <button type="submit" class="btn btn-primary" id="modal-start-test-btn" disabled>
+            <i class="bi bi-play-circle me-2"></i>Start Test
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Spinner Overlay -->
+<div class="spinner-overlay" id="spinner-overlay">
+  <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // CSRF Token Setup
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  // Initialize Choices.js for select elements
+  new Choices('#subject-filter', {
+    placeholder: true,
+    placeholderValue: 'All Subjects'
+  });
+  new Choices('#topic-filter', {
+    placeholder: true,
+    placeholderValue: 'All Topics'
+  });
+  new Choices('#difficulty-filter', {
+    placeholder: true,
+    placeholderValue: 'All Difficulties'
+  });
+
+  // Form Submission Spinner
+  const filterForm = document.getElementById('filter-form');
+  const deleteForm = document.getElementById('deleteForm');
+  const startTestForms = document.querySelectorAll('.start-test-form');
+  const spinnerOverlay = document.getElementById('spinner-overlay');
+
+  filterForm.addEventListener('submit', function() {
+    spinnerOverlay.style.display = 'flex';
+  });
+  deleteForm.addEventListener('submit', function() {
+    spinnerOverlay.style.display = 'flex';
+  });
+  startTestForms.forEach(form => {
+    form.addEventListener('submit', function() {
+      spinnerOverlay.style.display = 'flex';
+    });
+  });
+
+  // Delete Modal Logic
+  const deleteButtons = document.querySelectorAll('[data-test-id]');
+  deleteButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      const testId = this.getAttribute('data-test-id');
+      deleteForm.action = `/api/tests/${testId}/delete/`;
+    });
+  });
+
+  // Remove Filter Logic
+  window.removeFilter = function(type) {
+    const input = document.getElementById(`${type}-filter`);
+    if (input) {
+      input.value = '';
+      filterForm.submit();
+    }
+  };
+
+  // View Test Modal Logic
+  const viewTestButtons = document.querySelectorAll('.view-test-btn');
+  const viewTestModal = document.getElementById('viewTestModal');
+  const testDetailsLoading = document.getElementById('test-details-loading');
+  const testDetailsContent = document.getElementById('test-details-content');
+  const modalStartTestForm = document.getElementById('modal-start-test-form');
+  const modalStartTestBtn = document.getElementById('modal-start-test-btn');
+
+  viewTestButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      const testId = this.getAttribute('data-test-id');
+      testDetailsLoading.style.display = 'block';
+      testDetailsContent.style.display = 'none';
+      modalStartTestBtn.disabled = true;
+
+      fetch(`/api/tests/${testId}/`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-CSRFToken': csrftoken
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        testDetailsLoading.style.display = 'none';
+        testDetailsContent.style.display = 'block';
+
+        // Populate modal fields
+        document.getElementById('test-title').textContent = data.title;
+        document.getElementById('test-subject').textContent = data.subject_name || 'N/A';
+        document.getElementById('test-duration').textContent = data.duration;
+        document.getElementById('test-questions').textContent = data.questions.length;
+        document.getElementById('test-difficulty').textContent = data.difficulty_display;
+        document.getElementById('test-scoring-correct').textContent = data.scoring_scheme.correct;
+        document.getElementById('test-scoring-incorrect').textContent = data.scoring_scheme.incorrect;
+        document.getElementById('test-max-attempts').textContent = data.max_attempts;
+        document.getElementById('test-created-by').textContent = data.created_by || 'Unknown';
+        document.getElementById('test-topics').textContent = data.topics.length ? data.topics.map(t => t.name).join(', ') : 'Not specified';
+
+        // Populate attempt history for students
+        const attemptsSection = document.getElementById('test-attempts-section');
+        const attemptsContainer = document.getElementById('test-attempts');
+        const attemptsRemaining = document.getElementById('test-attempts-remaining');
+        if (data.attempts && data.attempts.length > 0) {
+          attemptsContainer.innerHTML = data.attempts.map(attempt => `
+            <div class="border-bottom py-2">
+              <p class="mb-1"><strong>Attempt #${attempt.attempt_number}</strong>: Score ${attempt.score}/${attempt.max_score}</p>
+              <p class="text-muted small">Completed: ${new Date(attempt.end_time).toLocaleString()}</p>
+            </div>
+          `).join('');
+          attemptsRemaining.textContent = data.attempts_remaining;
+        } else {
+          attemptsContainer.innerHTML = '<p class="text-muted">No attempts yet.</p>';
+          attemptsRemaining.textContent = data.attempts_remaining || data.max_attempts;
+        }
+
+        // Show attempt section only for students
+        attemptsSection.style.display = data.attempts ? 'block' : 'none';
+
+        // Enable Start Test button if attempts remain
+        if (data.attempts_remaining > 0) {
+          modalStartTestBtn.disabled = false;
+          document.getElementById('modal-test-id').value = testId;
+        }
+
+        // Show modal
+        const modal = new bootstrap.Modal(viewTestModal);
+        modal.show();
+      })
+      .catch(error => {
+        testDetailsLoading.textContent = 'Error loading test details';
+        console.error('Error fetching test details:', error);
+      });
+    });
+  });
+
+  // Initialize Tooltips
+  const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
+
+  // Persist Filter Selections
+  const filters = ['subject', 'topic', 'difficulty', 'created_after'];
+  filters.forEach(filter => {
+    const input = document.getElementById(`${filter}-filter`);
+    if (input) {
+      const savedValue = localStorage.getItem(`test_list_${filter}`);
+      if (input) input.value = savedValue;
+      input.addEventListener('change', function() {
+        localStorage.setItem(`test_list_${filter}`, this.value);
+      });
+    }
+  });
+});
+</script>
+{% endblock %}
+{% endblock %}
+{% comment %} {% extends 'base/base.html' %}
+{% load static %}
+{% load form_tags %}
+
+{% block title %}Test List - MCQ Master{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<style>
+  .test-list-container {
+    min-height: 100vh;
+    background: #f8f9fa;
+    padding: 3rem 2rem; /* Increased top padding for spacing below navbar */
+  }
+
+  /* Enhanced Sidebar Filters */
+  .sidebar {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    height: fit-content;
+    position: sticky;
+    top: 2rem;
+  }
+
+  .filter-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+  }
+
+  /* Enhanced Test Cards */
+  .test-card {
+    background: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  .test-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-metadata {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .meta-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .difficulty-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 8px;
+  }
+
+  .badge-easy { background: #10b981; color: white; }
+  .badge-medium { background: #f59e0b; color: white; }
+  .badge-hard { background: #ef4444; color: white; }
+
+  .progress-container {
+    padding: 0 1.5rem 1.5rem;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e9ecef;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .test-list-container {
+      padding: 2rem 1rem; /* Adjusted for smaller screens */
+    }
+    
+    .card-metadata {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="test-list-container">
+  <div class="row g-4">
+    <!-- Enhanced Sidebar Filters -->
+    <div class="col-lg-3 col-md-12">
+      <div class="sidebar">
+        <h5 class="filter-section-title">Filter Tests</h5>
+        <form id="filter-form" method="get" action="{% url 'test_list' %}">
+          <!-- Subject Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Subject</label>
+            <select name="subject" class="form-select" id="subject-filter">
+              <option value="">All Subjects</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" {% if current_filters.subject == subject.id|stringformat:"s" %}selected{% endif %}>
+                {{ subject.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Topic Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Topic</label>
+            <select name="topic" class="form-select" id="topic-filter">
+              <option value="">All Topics</option>
+              {% for topic in topics %}
+              <option value="{{ topic.id }}" {% if current_filters.topic == topic.id|stringformat:"s" %}selected{% endif %}>
+                {{ topic.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Difficulty Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Difficulty</label>
+            <select name="difficulty" class="form-select" id="difficulty-filter">
+              <option value="">All Difficulties</option>
+              <option value="Easy" {% if current_filters.difficulty == 'Easy' %}selected{% endif %}>Easy</option>
+              <option value="Medium" {% if current_filters.difficulty == 'Medium' %}selected{% endif %}>Medium</option>
+              <option value="Hard" {% if current_filters.difficulty == 'Hard' %}selected{% endif %}>Hard</option>
+            </select>
+          </div>
+
+          <!-- Date Filter -->
+          <div class="mb-4">
+            <label class="form-label fw-medium">Created After</label>
+            <input type="date" name="created_after" class="form-control" id="created_after-filter"
+                   value="{{ current_filters.created_after|default:'' }}">
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-funnel me-2"></i>Apply Filters
+          </button>
+        </form>
+
+        <!-- Active Filters -->
+        <div class="mt-4">
+          <h6 class="filter-section-title">Active Filters</h6>
+          <div class="d-flex flex-wrap gap-2">
+            {% for filter, value in current_filters.items %}
+              {% if value %}
+              <span class="badge bg-secondary d-flex align-items-center gap-1 filter-badge" data-type="{{ filter }}">
+                {{ filter|title }}: {{ value }}
+                <button type="button" class="btn-close btn-close-white" 
+                        onclick="removeFilter('{{ filter }}')"></button>
+              </span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Enhanced Test Grid -->
+    <div class="col-lg-9 col-md-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h4 fw-bold mb-0">Available Tests</h2>
+        {% if request.user.role == 'TE' %}
+        <a href="{% url 'test_create' %}" class="btn btn-primary">
+          <i class="bi bi-plus-circle me-2"></i>Create New Test
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="row g-4">
+        {% for test in results %}
+        <div class="col-xxl-4 col-lg-6 col-md-12">
+          <div class="test-card">
+            <!-- Card Header -->
+            <div class="card-header">
+              <h3 class="card-title mb-0">{{ test.title }}</h3>
+              <span class="badge bg-light text-dark">{{ test.subject.name }}</span>
+            </div>
+
+            <!-- Card Metadata -->
+            <div class="card-metadata">
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+                {{ test.questions.count }} Questions
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-clock"></i>
+                </span>
+                {{ test.duration }} Minutes
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-bar-chart"></i>
+                </span>
+                {{ test.scoring_scheme.correct }}/{{ test.scoring_scheme.incorrect }} Scoring
+              </div>
+
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <i class="bi bi-lightning-charge"></i>
+                </span>
+                <span class="difficulty-badge {% if test.difficulty == 'E' %}badge-easy{% elif test.difficulty == 'M' %}badge-medium{% else %}badge-hard{% endif %}">
+                  {{ test.get_difficulty_display }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Attempts: {{ test.attempts.count }}/{{ test.max_attempts }}</span>
+              </div>
+              <div class="progress" style="height: 6px;">
+                <div class="progress-bar bg-primary" 
+                     role="progressbar" 
+                     style="width: {{ test.attempt_percentage }}%">
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+              <button class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 view-test-btn" 
+                      data-bs-toggle="modal" data-bs-target="#viewTestModal" data-test-id="{{ test.id }}">
+                <i class="bi bi-eye"></i> View
+              </button>
+              {% if request.user.role == 'TE' %}
+              <a href="{% url 'test_update' test.id %}" 
+                 class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <button class="btn btn-outline-danger btn-sm delete-btn" data-bs-toggle="modal" data-bs-target="#deleteModal"
+                      data-test-id="{{ test.id }}">
+                <i class="bi bi-trash"></i>
+              </button>
+              {% else %}
+              <form method="post" action="{% url 'attempt_list' %}" class="start-test-form">
+                {% csrf_token %}
+                <input type="hidden" name="test" value="{{ test.id }}">
+                <button type="submit" class="btn btn-primary btn-sm flex-fill">
+                  <i class="bi bi-play-circle me-2"></i>Start Test
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+          <div class="alert alert-info text-center">
+            <i class="bi bi-info-circle me-2"></i>
+            No tests found matching your criteria
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if results.has_other_pages %}
+      <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if results.has_previous %}
+          <li class="page-item">
+            <a class="page-link" 
+               href="?page={{ results.previous_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              Previous
+            </a>
+          </li>
+          {% endif %}
+
+          {% for num in results.paginator.page_range %}
+          <li class="page-item {% if results.number == num %}active{% endif %}">
+            <a class="page-link" 
+               href="?page={{ num }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              {{ num }}
+            </a>
+          </li>
+          {% endfor %}
+
+          {% if results.has_next %}
+          <li class="page-item">
+            <a class="page-link" 
+               href="?page={{ results.next_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+              Next
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to delete this test? This action cannot be undone.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="post" action="">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-2"></i>Delete</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- View Test Modal -->
+<div class="modal fade" id="viewTestModal" tabindex="-1" aria-labelledby="viewTestModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="viewTestModalLabel">Test Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-center text-muted" id="test-details-loading">Loading test details...</div>
+        <div id="test-details-content" style="display: none;">
+          <h4 id="test-title" class="mb-3"></h4>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <p><strong>Subject:</strong> <span id="test-subject"></span></p>
+              <p><strong>Duration:</strong> <span id="test-duration"></span> minutes</p>
+              <p><strong>Questions:</strong> <span id="test-questions"></span></p>
+              <p><strong>Difficulty:</strong> <span id="test-difficulty"></span></p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Scoring:</strong> Correct: <span id="test-scoring-correct"></span>, Incorrect: <span id="test-scoring-incorrect"></span></p>
+              <p><strong>Max Attempts:</strong> <span id="test-max-attempts"></span></p>
+              <p><strong>Created By:</strong> <span id="test-created-by"></span></p>
+              <p><strong>Topics:</strong> <span id="test-topics"></span></p>
+            </div>
+          </div>
+          <div class="mt-4" id="test-attempts-section">
+            <h5>Attempt History</h5>
+            <div id="test-attempts"></div>
+            <p><strong>Attempts Remaining:</strong> <span id="test-attempts-remaining"></span></p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <form method="post" action="{% url 'attempt_list' %}" class="start-test-form" id="modal-start-test-form">
+          {% csrf_token %}
+          <input type="hidden" name="test" id="modal-test-id">
+          <button type="submit" class="btn btn-primary" id="modal-start-test-btn" disabled>
+            <i class="bi bi-play-circle me-2"></i>Start Test
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Spinner Overlay -->
+<div class="spinner-overlay" id="spinner-overlay">
+  <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize Choices.js for select elements
+  new Choices('#subject-filter', {
+    placeholder: true,
+    placeholderValue: 'All Subjects'
+  });
+  new Choices('#topic-filter', {
+    placeholder: true,
+    placeholderValue: 'All Topics'
+  });
+  new Choices('#difficulty-filter', {
+    placeholder: true,
+    placeholderValue: 'All Difficulties'
+  });
+
+  // Form Submission Spinner
+  const filterForm = document.getElementById('filter-form');
+  const deleteForm = document.getElementById('deleteForm');
+  const spinnerOverlay = document.getElementById('spinner-overlay');
+
+  filterForm.addEventListener('submit', function() {
+    spinnerOverlay.style.display = 'flex';
+  });
+  deleteForm.addEventListener('submit', function() {
+    spinnerOverlay.style.display = 'flex';
+  });
+
+  // Delete Modal Logic
+  const deleteButtons = document.querySelectorAll('[data-test-id]');
+  deleteButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      const testId = this.getAttribute('data-test-id');
+      deleteForm.action = `/api/tests/${testId}/delete/`;
+    });
+  });
+
+  // Remove Filter Logic
+  window.removeFilter = function(type) {
+    const input = document.getElementById(`${type}-filter`);
+    if (input) {
+      input.value = '';
+      filterForm.submit(); // Submit form to refresh with cleared filter
+    }
+  };
+
+  // Initialize Tooltips
+  const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
+
+  // Persist Filter Selections
+  const filters = ['subject', 'topic', 'difficulty', 'created_after'];
+  filters.forEach(filter => {
+    const input = document.getElementById(`${filter}-filter`);
+    if (input) {
+      const savedValue = localStorage.getItem(`test_list_${filter}`);
+      if (savedValue) input.value = savedValue;
+      input.addEventListener('change', function() {
+        localStorage.setItem(`test_list_${filter}`, this.value);
+      });
+    }
+  });
+});
+</script>
+{% endblock %}
+{% endblock %} {% endcomment %}
+{% comment %} {% extends 'base/base.html' %}
+{% load static %}
+{% load form_tags %}
+
+{% block title %}Test List - MCQ Master{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<style>
+  .test-list-container {
+    min-height: 100vh;
+    background: #f8f9fa;
     padding: 2rem;
   }
 
@@ -250,19 +1326,7 @@
               </div>
             </div>
 
-            {% comment %} <!-- Progress Bar -->
-            <div class="progress-container">
-              <div class="d-flex justify-content-between small mb-2">
-                <span>Attempts: {{ test.attempts.count }}/{{ test.max_attempts }}</span>
-              </div>
-              <div class="progress" style="height: 6px;">
-                <div class="progress-bar bg-primary" 
-                     role="progressbar" 
-                     style="width: {{ test.attempt_percentage }}%">
-                </div>
-              </div>
-            </div> {% endcomment %}
-
+           
             <!-- Action Buttons -->
             <div class="action-buttons">
               <a href="#" 
@@ -429,7 +1493,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-{% endblock %}
+{% endblock %} {% endcomment %}
 {% comment %} 
 {% extends 'base/base.html' %}
 {% load static %}

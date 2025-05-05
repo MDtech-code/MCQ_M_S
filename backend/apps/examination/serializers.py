@@ -124,6 +124,7 @@ logger = logging.getLogger(__name__)
 
 class TestSerializer(serializers.ModelSerializer):
     subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all())
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
     questions = serializers.PrimaryKeyRelatedField(many=True, queryset=Question.objects.filter(is_active=True), required=False)
     created_by = serializers.StringRelatedField(read_only=True)
     scoring_scheme = serializers.JSONField()
@@ -132,7 +133,7 @@ class TestSerializer(serializers.ModelSerializer):
     class Meta:
         model = Test
         fields = [
-            'id', 'title', 'created_by', 'subject', 'questions', 'duration',
+            'id', 'title', 'created_by', 'subject','subject_name', 'questions', 'duration',
             'max_attempts', 'scoring_scheme', 'question_filters', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']

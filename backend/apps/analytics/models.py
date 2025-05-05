@@ -3,7 +3,9 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.forms import ValidationError
 from apps.common.models import TimeStampedModel
 from django.db.models.functions import Upper
+import logging
 
+logger = logging.getLogger(__name__)
 class StudentProgress(TimeStampedModel):
     student = models.ForeignKey('accounts.User', on_delete=models.CASCADE)
     subject = models.ForeignKey('content.Subject', on_delete=models.CASCADE)
@@ -33,11 +35,13 @@ class StudentProgress(TimeStampedModel):
     def update_progress(self):
         from apps.examination.models import TestAttempt, StudentResponse
         from apps.content.models import Topic
+        logger.debug(f'Updating progress for student {self.student.email}, subject {self.subject.name}')
         attempts = TestAttempt.objects.filter(
             student=self.student,
-            test__subjects=self.subject,
+            test__subject=self.subject,
             score__isnull=False
         )
+        logger.debug(f'Found {attempts.count()} attempts')
         self.total_attempts = attempts.count()
         if self.total_attempts > 0:
             self.average_score = attempts.aggregate(models.Avg('score'))['score__avg']
@@ -49,6 +53,7 @@ class StudentProgress(TimeStampedModel):
             attempt__in=attempts,
             question__topics__subject=self.subject
         ).select_related('question')
+        logger.debug(f'Found {responses.count()} responses')
         
         topic_performance = {}
         for response in responses:
@@ -73,7 +78,7 @@ class StudentProgress(TimeStampedModel):
 
         self.feedback = '\n'.join(feedback_lines) or "Keep practicing to identify strengths and weaknesses."
         self.save()
-
+        logger.info(f'Saved StudentProgress: total_attempts={self.total_attempts}, average_score={self.average_score}')
 class TestAnalytics(TimeStampedModel):
     test = models.OneToOneField('examination.Test', on_delete=models.CASCADE)
     average_score = models.FloatField(
@@ -88,7 +93,8 @@ class TestAnalytics(TimeStampedModel):
 
     class Meta:
         indexes = [
-            models.Index(fields=['test']),
+       
+     models.Index(fields=['test']),
         ]
 
     def update_analytics(self):

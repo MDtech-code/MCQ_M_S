@@ -11,3 +11,6 @@ def my_view(request):
     logger.debug("Processing request from %s", request.user)
     logger.info("Order created: %d", order.id)
     logger.error("Payment failed: %s", error)
+
+
+python -m celery -A config worker --pool=threads --loglevel=info

@@ -1,8 +1,9 @@
 from django.urls import path
-from .views import TestCreateView, TestListView, TestUpdateView, TestDeleteView, TestListView, TestAttemptView, StudentResponseView,TestResultsView
+from .views import TestCreateView, TestListView,TestDetailView, TestUpdateView, TestDeleteView, TestListView, TestAttemptView, StudentResponseView,TestResultsView
 
 urlpatterns = [
     path('tests/', TestListView.as_view(), name='test_list'),
+    path('tests/<int:pk>/', TestDetailView.as_view(), name='test_detail'),
     path('tests/create/', TestCreateView.as_view(), name='test_create'),
     path('tests/<int:pk>/update/', TestUpdateView.as_view(), name='test_update'),
     path('tests/<int:pk>/delete/', TestDeleteView.as_view(), name='test_delete'),
