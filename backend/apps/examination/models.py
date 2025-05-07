@@ -72,7 +72,7 @@ class TestAttempt(TimeStampedModel):
     
     
     class Meta:
-        unique_together = ('student', 'test')
+        # unique_together = ('student', 'test')
         indexes = [
             models.Index(fields=['student'])
         ]

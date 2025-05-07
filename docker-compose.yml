@@ -2,8 +2,6 @@
 
 
 services:
-
-
   backend:
     build:
      context: ./backend
@@ -16,6 +14,8 @@ services:
       - backend
     ports:
       - "8000:8000"
+    depends_on:
+      - redis
     develop:
       watch:
         - action: sync
@@ -51,6 +51,38 @@ services:
             - "node_modules"
         - action: rebuild
           path: ./frontend/package.json
+  redis:
+    image: redis:7
+    networks:
+      - backend
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+  
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    networks:
+      - backend
+    command: python -m celery -A config worker --pool=threads --loglevel=info
+    depends_on:
+      - redis
+      - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - "**/__pycache__"
+            - "**/*.pyc"
 
 
 
@@ -60,4 +92,5 @@ networks:
 
 
 
-
+volumes:
+  redis_data:

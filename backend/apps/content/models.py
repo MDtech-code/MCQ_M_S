@@ -2,9 +2,10 @@ from django.db import models
 from apps.common.models import TimeStampedModel
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
+from apps.content.utils.validations import validate_subject_name, validate_topic_name
 # Create your models here.
 class Subject(TimeStampedModel):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100, unique=True, validators=[validate_subject_name])
     description = models.TextField(blank=True)
 
     class Meta:
@@ -16,10 +17,9 @@ class Subject(TimeStampedModel):
         return self.name
 
 class Topic(TimeStampedModel):
-    subject = models.ForeignKey(Subject, on_delete=models.PROTECT)
-    name = models.CharField(max_length=100)
-    parent_topic = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
-    # difficulty_level = models.PositiveIntegerField(default=1)
+    subject = models.ForeignKey(Subject, on_delete=models.PROTECT,related_name="topics")
+    name = models.CharField(max_length=100, validators=[validate_topic_name])
+    parent_topic = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True,related_name='subtopics')
     difficulty_level = models.PositiveIntegerField(default=1, validators=[
     MinValueValidator(1),
     MaxValueValidator(5)
@@ -54,9 +54,9 @@ class Question(TimeStampedModel):
     question_text = models.TextField()
     question_type = models.CharField(max_length=50, default='MCQ')
     difficulty = models.CharField(max_length=1, choices=DIFFICULTY_CHOICES)
-    topics = models.ManyToManyField(Topic,blank=True)
-    created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
-    metadata = models.JSONField(default=dict)  # For explanations, references
+    topics = models.ManyToManyField(Topic,blank=True,related_name="questions")
+    created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True,related_name="questions")
+    metadata = models.JSONField(default=dict)  
     
     # Answer structure for MCQs
     def validate_options(value):
@@ -76,6 +76,7 @@ class Question(TimeStampedModel):
             models.Index(fields=['difficulty']),
             models.Index(fields=['created_by']),
             models.Index(fields=['question_type']),
+            models.Index(fields=['created_at']),
         ]
     def clean(self):
         if self.correct_answer not in self.options:
@@ -94,7 +95,7 @@ class QuestionApproval(TimeStampedModel):
         ('APPROVED', 'Approved'),
         ('REJECTED', 'Rejected'),
     )
-    question = models.OneToOneField(Question, on_delete=models.CASCADE, related_name='approval')
+    question = models.OneToOneField('Question', on_delete=models.CASCADE, related_name='approval')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     flagged_by_system = models.BooleanField(default=False)
     flag_reason = models.TextField(blank=True)

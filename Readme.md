@@ -14,3 +14,6 @@ def my_view(request):
 
 
 python -m celery -A config worker --pool=threads --loglevel=info
+
+
+python manage.py runsslserver 0.0.0.0:8000 --certificate /app/ssl/localhost.pem --key /app/ssl/localhost-key.pem

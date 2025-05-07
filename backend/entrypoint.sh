@@ -9,4 +9,4 @@ echo "MySQL is up - executing command"
 
 
 
-python manage.py runsslserver 0.0.0.0:8000 --certificate /app/ssl/localhost.pem --key /app/ssl/localhost-key.pem
+python manage.py runserver 0.0.0.0:8000

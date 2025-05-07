@@ -280,10 +280,18 @@
 
                 <!-- Form Actions -->
                 <div class="text-center mt-5">
-                    <button type="submit" class="btn-custom btn-custom-primary">
+                     {% if user.role == 'TE' and not user.is_approved or not user.is_verified %}
+                    <button type="button" class="btn-custom btn-custom-primary" onclick="showRestrictedModal()">
                         <i class="bi {% if is_update %}bi-check2-circle{% else %}bi-save{% endif %} me-2"></i>
                         {% if is_update %}Update Question{% else %}Create Question{% endif %}
                     </button>
+                    {% else %}
+                     <button type="submit" class="btn-custom btn-custom-primary">
+                        <i class="bi {% if is_update %}bi-check2-circle{% else %}bi-save{% endif %} me-2"></i>
+                        {% if is_update %}Update Question{% else %}Create Question{% endif %}
+                    </button>
+
+                    {% endif %}
                     <a href="{% url 'question_list' %}" class="btn-custom btn-custom-secondary ms-3">
                         <i class="bi bi-x-circle me-2"></i>Cancel
                     </a>

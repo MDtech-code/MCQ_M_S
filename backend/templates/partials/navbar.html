@@ -24,6 +24,7 @@
           {% endif %}
           <!-- Logged-In User -->
           {% if user.role == 'ST' %}
+          
             <li class="nav-item">
               <a class="nav-link" href="{% url "test_list" %}">
                 <i class="bi bi-pencil-square me-1"></i>Take Test
@@ -56,12 +57,24 @@
               <i class="bi bi-person-circle me-1"></i>{% if user.is_authenticated %} {{user.username}}{%endif%}
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
+
               <li><a class="dropdown-item" href="{% url 'profile' %}">Profile</a></li>
-              <li><a class="dropdown-item" href="{% url 'change_password' %}">Change Password</a></li>
-              <li><a class="dropdown-item" href="{% url 'update_email' %}">Update Email</a></li>
-              <li><a class="dropdown-item" href="{% url 'delete_account' %}">Delete Account</a></li>
-              <li><a class="dropdown-item" href="{% url "settings_dashboard" %}">Settings</a></li>
-              <li><hr class="dropdown-divider"></li>
+{% if user.role == 'TE' or user.role == 'ST' %}
+    {% if not user.is_approved or not user.is_verified %}
+        <li><a class="dropdown-item" onclick="showRestrictedModal()">Change Password</a></li>
+        <li><a class="dropdown-item" onclick="showRestrictedModal()">Update Email</a></li>
+        <li><a class="dropdown-item" onclick="showRestrictedModal()">Delete Account</a></li>
+        <li><a class="dropdown-item" onclick="showRestrictedModal()">Settings</a></li>
+        <li><hr class="dropdown-divider"></li>
+    {% else %}
+        <li><a class="dropdown-item" href="{% url 'change_password' %}">Change Password</a></li>
+        <li><a class="dropdown-item" href="{% url 'update_email' %}">Update Email</a></li>
+        <li><a class="dropdown-item" href="{% url 'delete_account' %}">Delete Account</a></li>
+        <li><a class="dropdown-item" href="{% url 'settings_dashboard' %}">Settings</a></li>
+        <li><hr class="dropdown-divider"></li>
+    {% endif %}
+{% endif %}
+              
               <li>
                 <form action="{% url 'logout' %}" method="post">
                   {% csrf_token %}

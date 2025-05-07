@@ -10,11 +10,21 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='*')
 
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': config('REDIS_URL', default='redis://redis:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",  # Use Redis for production
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],  # Redis server address (default)
+             'hosts': [(config('REDIS_HOST', default='redis'), config('REDIS_PORT', default=6379, cast=int))],
         },
     },
 }
@@ -218,8 +228,8 @@ X_FRAME_OPTIONS = 'DENY'
 SILENCED_SYSTEM_CHECKS = ['models.W037', 'models.W044']
 
 # celery settings 
-CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0' #Use your redis url if you have password or other configuration
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0' #Use your redis url if you have password or other configuration
+CELERY_BROKER_URL = config('REDIS_URL', default='redis://redis:6379/0')
+CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://redis:6379/0')
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_ACCEPT_CONTENT = ['json']

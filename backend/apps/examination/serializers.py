@@ -5,8 +5,11 @@ from apps.content.models import Question, Subject, Topic
 from apps.content.serializers import QuestionSerializer
 from apps.accounts.models import User  # Import User model
 from django.utils import timezone
+from django.core.cache import cache
 from datetime import timedelta
+from apps.content.utils.validations import log_validation_error
 import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -254,23 +257,49 @@ class TestAttemptSerializer(serializers.ModelSerializer):
         fields = ['id', 'test', 'student', 'start_time', 'end_time', 'score']
         read_only_fields = ['id', 'student', 'start_time', 'end_time', 'score']
 
+    # def validate(self, data):
+    #     student = self.context['request'].user
+    #     logger.debug(f"User: {student}, Role: {student.role}, Role Type: {type(student.role)}")
+    #     if student.role != User.Role.STUDENT:
+    #         logger.warning(f"Validation failed: User {student.email} has role {student.role}, expected {User.Role.STUDENT}")
+    #         raise serializers.ValidationError("Only students can start attempts.")
+    #     test = data['test']
+    #     attempts = TestAttempt.objects.filter(test=test, student=student).count()
+    #     if attempts >= test.max_attempts:
+    #         logger.warning(f"Validation failed: Maximum attempts reached for user {student.email} on test {test.id}")
+    #         raise serializers.ValidationError("Maximum attempts reached.")
+    #     return data
     def validate(self, data):
+        """Check if the student has remaining attempts."""
         student = self.context['request'].user
         logger.debug(f"User: {student}, Role: {student.role}, Role Type: {type(student.role)}")
         if student.role != User.Role.STUDENT:
-            logger.warning(f"Validation failed: User {student.email} has role {student.role}, expected {User.Role.STUDENT}")
-            raise serializers.ValidationError("Only students can start attempts.")
+            log_validation_error("role", student.role, f"Expected {User.Role.STUDENT}")
+            raise serializers.ValidationError({"non_field_errors": "Only students can start attempts."})
         test = data['test']
-        attempts = TestAttempt.objects.filter(test=test, student=student).count()
-        if attempts >= test.max_attempts:
-            logger.warning(f"Validation failed: Maximum attempts reached for user {student.email} on test {test.id}")
-            raise serializers.ValidationError("Maximum attempts reached.")
+        max_attempts = test.max_attempts or 1
+        cache_key = f"test_attempts:{student.id}:{test.id}"
+        cached_count = cache.get(cache_key)
+        if cached_count is None:
+            attempts = TestAttempt.objects.filter(test=test, student=student).count()
+            cache.set(cache_key, attempts, timeout=3600)  # 1 hour
+        else:
+            attempts = cached_count
+        if attempts >= max_attempts:
+            log_validation_error("test", test.id, f"Maximum attempts reached: {attempts}/{max_attempts}")
+            raise serializers.ValidationError({"test": f"Maximum attempts ({max_attempts}) reached"})
         return data
+
 
     def create(self, validated_data):
         validated_data['student'] = self.context['request'].user
         validated_data['start_time'] = timezone.now()
-        return super().create(validated_data)
+        attempt = super().create(validated_data)
+        # Update cache
+        cache_key = f"test_attempts:{validated_data['student'].id}:{validated_data['test'].id}"
+        cached_count = cache.get(cache_key, 0)
+        cache.set(cache_key, cached_count + 1, timeout=3600)
+        return attempt
 
 # class StudentResponseSerializer(serializers.ModelSerializer):
 #     class Meta:

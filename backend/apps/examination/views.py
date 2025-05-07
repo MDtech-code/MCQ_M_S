@@ -1703,6 +1703,191 @@ class TestDetailView(APIView):
         logger.debug(f"Test details for {request.user.email}: {data}")
         return Response(data)
 
+
+@method_decorator(ensure_csrf_cookie, name='dispatch')
+class TestAttemptView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
+    renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
+
+    def get_renderers(self):
+        # Force PATCH to only use JSONRenderer
+        if self.request.method.lower() == 'patch':
+            return [JSONRenderer()]
+        return super().get_renderers()
+
+    def get(self, request, pk=None):
+        logger.debug('Processing GET request for TestAttemptView')
+        if pk:
+            try:
+                attempt = TestAttempt.objects.get(pk=pk, student=request.user)
+                serializer = TestAttemptSerializer(attempt)
+                if request.accepted_renderer.format == 'html':
+                    responses = StudentResponse.objects.filter(attempt=attempt)
+                    return Response(
+                        {
+                            'user': request.user,
+                            'attempt': attempt,
+                            'test': attempt.test,
+                            'questions': attempt.test.questions.all(),
+                            'responses': {r.question.id: r for r in responses}
+                        },
+                        template_name='examination/student/test_attempt.html'
+                    )
+                return Response(serializer.data)
+            except TestAttempt.DoesNotExist:
+                logger.warning(f"Attempt {pk} not found for {request.user.email}")
+                if request.accepted_renderer.format == 'html':
+                    messages.error(request, "Attempt not found.")
+                    return redirect('student_dashboard')
+                return Response({"error": "Attempt not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        attempts = TestAttempt.objects.filter(student=request.user)
+        serializer = TestAttemptSerializer(attempts, many=True)
+        if request.accepted_renderer.format == 'html':
+            return Response(
+                {'user': request.user, 'attempts': attempts},
+                template_name='examination/student/test_attempts.html'
+            )
+        return Response(serializer.data)
+
+    def post(self, request):
+        logger.debug(f"POST request data: {request.data}")
+        serializer = TestAttemptSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            attempt = serializer.save()
+            logger.info(f"Attempt {attempt.id} started by {request.user.email} for test {attempt.test.id}")
+            if request.accepted_renderer.format == 'html':
+                messages.success(request, "Test attempt started successfully.")
+                return redirect('attempt_detail', pk=attempt.id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        logger.warning(f"Attempt creation failed for {request.user.email}: {serializer.errors}")
+        if request.accepted_renderer.format == 'html':
+            error_msg = serializer.errors.get('test', serializer.errors.get('non_field_errors', 'Failed to start test.'))
+            messages.error(request, error_msg)
+            return redirect('student_dashboard')
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        try:
+            attempt = TestAttempt.objects.get(pk=pk, student=request.user)
+        except TestAttempt.DoesNotExist:
+            return Response({"error": "Attempt not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if attempt.end_time:
+            return Response({"error": "Attempt already submitted"}, status=status.HTTP_400_BAD_REQUEST)
+
+        now = timezone.now()
+        deadline = attempt.start_time + timedelta(minutes=attempt.test.duration)
+        if now > deadline:
+            attempt.end_time = deadline
+            attempt.calculate_score()
+            attempt.save()
+            logger.info(f"Attempt {attempt.id} submitted by {request.user.email} with score {attempt.score}")
+            return Response(
+                {"error": "Test duration expired", "score": attempt.score},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate scoring_scheme
+        scoring_scheme = attempt.test.scoring_scheme or {'correct': 1, 'incorrect': 0}
+        if not isinstance(scoring_scheme, dict) or 'correct' not in scoring_scheme:
+            logger.warning(f"Invalid scoring_scheme for test {attempt.test.id}: {scoring_scheme}")
+            scoring_scheme = {'correct': 1, 'incorrect': 0}
+        logger.debug(f"Scoring scheme for test {attempt.test.id}: {scoring_scheme}")
+
+        # Clear any prior responses
+        StudentResponse.objects.filter(attempt=attempt).delete()
+        logger.debug(f"Deleted prior StudentResponse objects for attempt {attempt.id}")
+
+        total_time = 0
+        correct_count = 0
+        total_q = attempt.test.questions.count()
+
+        # Handle both FormData (from test_attempt.html) and JSON (from API)
+        resp_list = request.data.get('responses', [])
+        if not resp_list and request.POST:
+            # FormData case: parse request.POST
+            raw = request.POST
+            form_data_log = {key: raw.get(key) for key in raw}
+            logger.debug(f"FormData received for attempt {attempt.id}: {form_data_log}")
+            resp_list = []
+            for question in attempt.test.questions.all():
+                ans = raw.get(f'answer_{question.id}', '').strip().upper()
+                time_taken = int(raw.get(f'time_taken_{question.id}', 0))
+                resp_list.append({
+                    'question': question.id,
+                    'selected_answer': ans,
+                    'time_taken': time_taken
+                })
+        else:
+            # JSON case: log received payload
+            logger.debug(f"JSON responses received for attempt {attempt.id}: {resp_list}")
+
+        for item in resp_list:
+            try:
+                q = Question.objects.get(pk=item['question'])
+            except Question.DoesNotExist:
+                logger.error(f"Question {item.get('question')} not found")
+                continue
+            ans = item.get('selected_answer', '').strip().upper() if item.get('selected_answer') else ''
+            is_correct = False
+            if ans:
+                is_correct = (ans == q.correct_answer.upper())
+                if is_correct:
+                    correct_count += 1
+            time_taken = int(item.get('time_taken', 0))
+            total_time += time_taken
+
+            # Log question details
+            logger.debug(f"Processing question {q.id}: correct_answer={q.correct_answer}, selected_answer={ans}, is_correct={is_correct}, time_taken={time_taken}")
+
+            serializer = StudentResponseSerializer(
+                data={
+                    'attempt': attempt.id,
+                    'question': q.id,
+                    'selected_answer': ans,
+                    'is_correct': is_correct,
+                    'time_taken': time_taken
+                },
+                context={'request': request}
+            )
+            serializer.is_valid(raise_exception=True)
+            response = serializer.save()
+            logger.debug(f"Created StudentResponse {response.id} for question {q.id}: selected_answer={ans}, is_correct={is_correct}, time_taken={time_taken}")
+
+        # Log StudentResponse objects after creation
+        responses = StudentResponse.objects.filter(attempt=attempt)
+        response_log = [
+            {
+                'response_id': r.id,
+                'question_id': r.question.id,
+                'selected_answer': r.selected_answer,
+                'is_correct': r.is_correct,
+                'time_taken': r.time_taken
+            } for r in responses
+        ]
+        logger.debug(f"StudentResponse objects for attempt {attempt.id}: {response_log}")
+
+        attempt.performance_metrics = {
+            'accuracy': correct_count / total_q if total_q else 0,
+            'avg_time_per_question': total_time / total_q if total_q else 0
+        }
+        logger.debug(f"Performance metrics for attempt {attempt.id}: correct_count={correct_count}, total_questions={total_q}, total_time={total_time}")
+
+        attempt.end_time = now
+        logger.debug(f"Calling calculate_score for attempt {attempt.id} with scoring_scheme={scoring_scheme}")
+        attempt.calculate_score()
+        logger.debug(f"Score calculated for attempt {attempt.id}: score={attempt.score}")
+        attempt.save()
+        logger.info(f"Attempt {attempt.id} submitted by {request.user.email} with score {attempt.score}")
+
+        return Response({
+            'id': attempt.id,
+            'score': attempt.score,
+            'performance_metrics': attempt.performance_metrics
+        }, status=status.HTTP_200_OK)
+'''
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class TestAttemptView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1884,6 +2069,7 @@ class TestAttemptView(APIView):
             'score': attempt.score,
             'performance_metrics': attempt.performance_metrics
         }, status=status.HTTP_200_OK)
+'''
 # @method_decorator(ensure_csrf_cookie, name='dispatch')
 # class TestAttemptView(APIView):
 #     permission_classes = [permissions.IsAuthenticated]

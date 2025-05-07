@@ -1,12 +1,12 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bullseye
 
 WORKDIR /app
 
-# Configure proper APT sources first
+
 RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.list && \
     echo "deb http://security.debian.org/debian-security bullseye-security main" >> /etc/apt/sources.list
 
-# Install system dependencies with required MySQL packages
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libmariadb-dev-compat \
@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Copy SSL certificates
-COPY ssl/ /app/ssl/
+# # Copy SSL certificates
+# COPY ssl/ /app/ssl/
 
 # Use entrypoint script
 COPY entrypoint.sh /app/

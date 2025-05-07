@@ -281,7 +281,7 @@ class MCQGenerationView(APIView):
 
 
 
-
+'''
 from apps.nlp_generator.ml_backend.question_utils import extract_cloze_and_answer
 from apps.nlp_generator.ml_backend.question_generator import generate_mcqs_from_paragraph
 from apps.nlp_generator.ml_backend.distractor_gen import get_distractors
@@ -396,3 +396,4 @@ class MCQMLGenerationView(APIView):
                 "topics": Topic.objects.all(),
                 "errors": {"detail": str(e)}
             }, template_name="nlp_generator/mcq_generate.html", status=400)
+'''

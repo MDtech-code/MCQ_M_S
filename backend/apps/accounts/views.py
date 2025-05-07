@@ -17,7 +17,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.renderers import JSONRenderer, TemplateHTMLRenderer
 from django.contrib import messages
-from apps.common.permissions import IsTeacher,IsStudent,IsApprovedTeacher,IsAdmin,IsVerifiedTeacher
+from apps.common.permissions import IsTeacher,IsStudent,IsApprovedTeacher,IsAdmin,IsVerified,IsNotAuthenticated
 
 import logging
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class SignupView(APIView):
     API endpoint for user registration.
     """
     renderer_classes = [JSONRenderer,TemplateHTMLRenderer]
-    permission_classes = [AllowAny]
+    permission_classes = [IsNotAuthenticated]
     authentication_classes=[SessionAuthentication]
 
     def get(self,request):
@@ -51,13 +51,7 @@ class SignupView(APIView):
             logger.info("User created successfully: %s (ID: %s)", user.username, user.id)
             user_signed_up.send(sender=self.__class__, user=user)
 
-
-           
-            
             token, _ = Token.objects.get_or_create(user=user)
-
-            
-                
             response_data={
                  "user": {
                      "id": user.id,
@@ -92,7 +86,6 @@ class SignupView(APIView):
                     template_name='accounts/auth/signup.html',
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
             return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         
 @method_decorator(ensure_csrf_cookie, name='dispatch')
@@ -101,7 +94,7 @@ class LoginView(APIView):
     API endpoint for user login.
     """
     authentication_classes=[SessionAuthentication]
-    permission_classes=[AllowAny]
+    permission_classes=[IsNotAuthenticated]
     renderer_classes = [JSONRenderer,TemplateHTMLRenderer]
 
     def get(self,request):
@@ -183,6 +176,7 @@ class LogoutView(APIView):
     renderer_classes = [JSONRenderer,TemplateHTMLRenderer]
 
     def post(self, request, *args, **kwargs):
+        
         username = request.user.username
         logger.info("Logout initiated for user '%s'", username)
         try:
@@ -218,48 +212,6 @@ class LogoutView(APIView):
 
 
 
-# class VerifyEmailView(APIView):
-#     permission_classes=[AllowAny]
-#     authentication_classes=[]
-    
-#     def get(self, request):
-#         token = request.query_params.get('token')
-#         if not token:
-#             logger.warning("No token provided for email verification")
-#             return Response(
-#                 {"error": "Token is required"},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#         try:
-#             token_obj = EmailVerificationToken.objects.get(token=token)
-#             if not token_obj.is_valid():
-#                 logger.warning(f"Expired token {token} for {token_obj.user.email}")
-#                 return Response(
-#                     {"error": "Token has expired"},
-#                     status=status.HTTP_400_BAD_REQUEST
-#                 )
-#             user = token_obj.user
-#             if user.is_verified:
-#                 logger.info(f"Email already verified for {user.email}")
-#                 return Response(
-#                     {"message": "Email already verified"},
-#                     status=status.HTTP_200_OK
-#                 )
-#             user.is_verified = True
-#             user.save()
-#             token_obj.delete()  # One-time use
-#             logger.info(f"Email verified for {user.email}")
-#             return Response(
-#                 {"message": "Email verified successfully"},
-#                 status=status.HTTP_200_OK
-#             )
-#         except EmailVerificationToken.DoesNotExist:
-#             logger.warning(f"Invalid token {token}")
-#             return Response(
-#                 {"error": "Invalid token"},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-        
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class VerifyEmailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -267,6 +219,10 @@ class VerifyEmailView(APIView):
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
     def get(self, request, token):
+    
+        print(f"Auth Header: {request.headers.get('Authorization')}")
+        print(f"Cookies: {request.COOKIES}")
+        print(f"User Authenticated? {request.user.is_authenticated}")
         try:
             
             token_obj = EmailVerificationToken.objects.get(token=token)
@@ -311,28 +267,7 @@ class VerifyEmailView(APIView):
             return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# class ResendVerificationEmailView(APIView):
-#     permission_classes = [IsAuthenticated]
-#     authentication_classes=[CookieTokenAuthentication]
 
-#     def post(self, request):
-#         user = request.user
-#         if user.is_verified:
-#             logger.info(f"User {user.email} already verified, resend rejected")
-#             return Response(
-#                 {"message": "Email already verified"},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#         # Delete old tokens
-#         EmailVerificationToken.objects.filter(user=user).delete()
-#         # Create new token
-#         token = EmailVerificationToken.objects.create(user=user)
-#         send_verification_email_task.delay(user.id, token.token)
-#         logger.info(f"Resent verification email for {user.email}")
-#         return Response(
-#             {"message": "Verification email sent"},
-#             status=status.HTTP_200_OK
-#         )
     
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ResendVerificationEmailView(APIView):
@@ -356,31 +291,11 @@ class ResendVerificationEmailView(APIView):
             messages.success(request, "Verification email sent.")
             return redirect('home')
         return Response({"message": "Verification email sent"}, status=status.HTTP_200_OK)
-# apps/accounts/views.py
 
-
-# class ForgotPasswordView(APIView):
-#     permission_classes=[AllowAny]
-#     authentication_classes=[]
-#     def post(self, request):
-#         serializer = ForgotPasswordSerializer(data=request.data)
-#         if serializer.is_valid():
-#             email = serializer.validated_data['email']
-#             try:
-#                 user = User.objects.get(email=email)
-#                 PasswordResetToken.objects.filter(user=user).delete()
-#                 token = PasswordResetToken.objects.create(user=user)
-#                 send_password_reset_email_task.delay(user.id, token.token)
-#                 logger.info(f"Password reset email triggered for {email}")
-#             except User.DoesNotExist:
-#                 pass  # Silent to avoid leaking
-#             return Response({"message": "Password reset email sent"})
-#         logger.warning(f"Forgot password failed: {serializer.errors}")
-#         return Response(serializer.errors, status=400)
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ForgotPasswordView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
+    permission_classes = [IsNotAuthenticated]
+    authentication_classes = [SessionAuthentication]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
     def get(self, request):
@@ -417,65 +332,12 @@ class ForgotPasswordView(APIView):
 
 
 
-# apps/accounts/views.py
 
-
-
-
-# class ResetPasswordView(APIView):
-#     permission_classes=[AllowAny]
-#     authentication_classes=[]
-  
-
-#     def post(self, request):
-#         # Extract token from query params
-#         token = request.query_params.get('token')
-#         if not token:
-#             logger.warning("No token provided in query parameters")
-#             return Response(
-#                 {"error": "Token is required in query parameters"},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-
-#         # Combine token with POST data
-#         data = {
-#             'token': token,
-#             'password': request.data.get('password'),
-#             'password2': request.data.get('password2')
-#         }
-
-#         serializer = ResetPasswordSerializer(data=data)
-#         if serializer.is_valid():
-#             try:
-#                 token_obj = PasswordResetToken.objects.get(token=serializer.validated_data['token'])
-#                 user = token_obj.user
-#                 user.set_password(serializer.validated_data['password'])
-#                 user.save()
-#                 token_obj.delete()  # One-time use
-#                 logger.info(f"Password reset for {user.email}")
-#                 # Delete DRF auth token to log out user
-#                 if request.auth:
-#                     request.auth.delete()
-#                     logger.info(f"Auth token deleted for user {user.email}")
-#                 else:
-#                     logger.warning(f"No auth token found for user {user.email}")
-#                 return Response(
-#                     {"message": "Password reset successfully"},
-#                     status=status.HTTP_200_OK
-#                 )
-#             except PasswordResetToken.DoesNotExist:
-#                 logger.warning(f"Invalid reset token {serializer.validated_data['token']}")
-#                 return Response(
-#                     {"error": "Invalid token"},
-#                     status=status.HTTP_400_BAD_REQUEST
-#                 )
-#         logger.warning(f"Reset password failed: {serializer.errors}")
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ResetPasswordView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
+    permission_classes = [IsNotAuthenticated]
+    authentication_classes = [SessionAuthentication]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
     def get(self, request, token):
@@ -534,29 +396,11 @@ class ResetPasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-# class ChangePasswordView(APIView):
-#     permission_classes = [IsAuthenticated]
-#     authentication_classes = [CookieTokenAuthentication]
 
-#     def post(self, request):
-#         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
-#         if serializer.is_valid():
-#             user = request.user
-#             user.set_password(serializer.validated_data['new_password'])
-#             user.save()
-#             # Optional: Delete auth token to force re-login
-#             if request.auth:
-#                 request.auth.delete()
-#                 logger.info(f"Auth token deleted for {user.email} after password change")
-#             logger.info(f"Password changed for {user.email}")
-#             return Response({"message": "Password changed successfully"}, status=status.HTTP_200_OK)
-#         logger.warning(f"Change password failed for {request.user.email}: {serializer.errors}")
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ChangePasswordView(APIView):
-    permission_classes = [IsAuthenticated, ]
+    permission_classes = [IsAuthenticated,IsVerified]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
@@ -567,6 +411,7 @@ class ChangePasswordView(APIView):
 
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        response = None 
         if serializer.is_valid():
             user = request.user
             user.set_password(serializer.validated_data['new_password'])
@@ -574,11 +419,24 @@ class ChangePasswordView(APIView):
             if request.auth:
                 request.auth.delete()
                 logger.info(f"Auth token deleted for {user.email} after password change")
+
+            # Logout the user for session-based authentication
+            logout(request)
+
+            # Create response and remove authentication cookies
+            response = Response({"message": "Password changed successfully"}, status=status.HTTP_200_OK)
+            response.delete_cookie('auth_token')
+            response.delete_cookie('csrftoken')
+
+            
             logger.info(f"Password changed for {user.email}")
             if request.accepted_renderer.format == 'html':
                 messages.success(request, "Password changed successfully. Please log in again.")
                 return redirect('login')
-            return Response({"message": "Password changed successfully"}, status=status.HTTP_200_OK)
+            return response
+        
+        
+
         logger.warning(f"Change password failed for {request.user.email}: %s", serializer.errors)
         if request.accepted_renderer.format == 'html':
             return Response(
@@ -588,60 +446,11 @@ class ChangePasswordView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-# apps/accounts/views.py
-# class DeleteAccountView(APIView):
-#     permission_classes = [IsAuthenticated]
-#     authentication_classes = [CookieTokenAuthentication]
 
-#     def post(self, request):
-#         serializer = DeleteAccountSerializer(data=request.data, context={'request': request})
-#         if serializer.is_valid():
-#             user = request.user
-#             email = user.email  # Store for email task
-#             role = user.role
-
-#             if role == User.Role.STUDENT:
-#                 # Hard delete for students
-#                 try:
-#                     # Delete related data (adjust based on your models)
-#                     StudentProfile.objects.filter(user=user).delete()
-#                     # Example: Delete test attempts
-#                     # TestAttempt.objects.filter(user=user).delete()
-#                     user.delete()  # Deletes User and cascades to related models
-#                     logger.info(f"Hard deletion completed for student {email}")
-#                     # Send confirmation email
-#                     send_deletion_confirmation_email_task.delay(email, role=User.Role.STUDENT)
-#                     return Response(
-#                         {"message": "Student account deleted permanently"},
-#                         status=status.HTTP_200_OK
-#                     )
-#                 except Exception as e:
-#                     logger.error(f"Hard deletion failed for {email}: {str(e)}")
-#                     return Response(
-#                         {"error": "Failed to delete account"},
-#                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#                     )
-#             else:  # TEACHER or ADMIN
-#                 # Soft delete for teachers (and admins, if applicable)
-#                 user.is_active = False
-#                 user.save()
-#                 logger.info(f"Soft deletion completed for {role} {email}")
-#                 # Send confirmation email
-#                 send_deletion_confirmation_email_task.delay(email, role=role)
-#                 # Delete auth token
-#                 if request.auth:
-#                     request.auth.delete()
-#                     logger.info(f"Auth token deleted for {email}")
-#                 return Response(
-#                     {"message": f"{role} account deactivated successfully"},
-#                     status=status.HTTP_200_OK
-#                 )
-#         logger.warning(f"Account deletion failed for {request.user.email}: {serializer.errors}")
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class DeleteAccountView(APIView):
-    permission_classes = [IsAuthenticated, ]
+    permission_classes = [IsAuthenticated,IsVerified ]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
@@ -692,33 +501,12 @@ class DeleteAccountView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# apps/accounts/views.py
 
-# class UpdateEmailView(APIView):
-#     permission_classes = [IsAuthenticated]
-#     authentication_classes = [CookieTokenAuthentication]
-
-#     def post(self, request):
-#         serializer = UpdateEmailSerializer(data=request.data, context={'request': request})
-#         if serializer.is_valid():
-#             user = request.user
-#             new_email = serializer.validated_data['new_email']
-#             user.email = new_email
-#             user.is_verified = False  # Require re-verification
-#             user.save()
-#             # Send verification email
-#             EmailVerificationToken.objects.filter(user=user).delete()
-#             token = EmailVerificationToken.objects.create(user=user)
-#             send_verification_email_task.delay(user.id, token.token)
-#             logger.info(f"Email updated to {new_email}, verification email sent")
-#             return Response({"message": "Email updated, please verify new email"}, status=status.HTTP_200_OK)
-#         logger.warning(f"Email update failed for {request.user.email}: {serializer.errors}")
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class UpdateEmailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated,IsVerified]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
@@ -749,190 +537,7 @@ class UpdateEmailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# class ProfileUpdateView(APIView):
-#     permission_classes = [IsAuthenticated]
-#     authentication_classes=[CookieTokenAuthentication]
 
-#     def get(self, request):
-#         user = request.user
-#         profile = user.get_profile()
-#         if not profile:
-#             logger.warning(f"No profile found for {user.email}")
-#             return Response(
-#                 {"error": "Profile not found"},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-#         serializer = (
-#             StudentProfileSerializer(profile)
-#             if user.role == User.Role.STUDENT
-#             else TeacherProfileSerializer(profile)
-#         )
-#         logger.info(f"Retrieved profile for {user.email}")
-#         return Response(serializer.data)
-
-#     def patch(self, request):
-#         user = request.user
-#         profile = user.get_profile()
-#         if not profile:
-#             logger.warning(f"No profile found for {user.email}")
-#             return Response(
-#                 {"error": "Profile not found"},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-#         serializer = (
-#             StudentProfileSerializer(profile, data=request.data, partial=True)
-#             if user.role == User.Role.STUDENT
-#             else TeacherProfileSerializer(profile, data=request.data, partial=True)
-#         )
-#         if serializer.is_valid():
-#             serializer.save()
-#             logger.info(f"Updated profile for {user.email}")
-#             return Response(serializer.data)
-#         logger.warning(f"Profile update failed for {user.email}: {serializer.errors}")
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-
-# @method_decorator(ensure_csrf_cookie, name='dispatch')
-# class ProfileView(APIView):
-#     permission_classes = [IsAuthenticated]
-#     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-#     renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
-
-#     def get(self, request):
-#         user = request.user
-#         profile = user.get_profile()
-#         if not profile:
-#             logger.warning(f"No profile found for {user.email}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.error(request, "Profile not found.")
-#                 return redirect('profile')
-#             return Response(
-#                 {"error": "Profile not found"},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-
-#         serializer = (
-#             StudentProfileSerializer(profile)
-#             if user.role == User.Role.STUDENT
-#             else TeacherProfileSerializer(profile)
-#         )
-
-#         if request.accepted_renderer.format == 'html':
-#             return Response(
-#                 {
-#                     'user': user,
-#                     'profile': profile,
-#                     'profile_data': serializer.data,
-#                     'is_update': False  # Flag to indicate view mode
-#                 },
-#                 template_name='account/teacher/profile.html'
-#             )
-#         logger.info(f"Retrieved profile for {user.email}")
-#         return Response(serializer.data)
-# @method_decorator(ensure_csrf_cookie, name='dispatch')
-# class ProfileUpdateView(APIView):
-#     permission_classes = [IsAuthenticated]
-#     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-#     renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
-
-#     def get(self, request):
-#         user = request.user
-#         profile = user.get_profile()
-#         if not profile:
-#             logger.warning(f"No profile found for {user.email}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.error(request, "Profile not found.")
-#                 return redirect('dashboard')  # Redirect to appropriate dashboard
-#             return Response(
-#                 {"error": "Profile not found"},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-
-#         serializer = (
-#             StudentProfileSerializer(profile)
-#             if user.role == User.Role.STUDENT
-#             else TeacherProfileSerializer(profile)
-#         )
-
-#         if request.accepted_renderer.format == 'html':
-#             return Response(
-#                 {
-#                     'user': user,
-#                     'profile': profile,
-#                     'form_data': serializer.data,
-#                     'is_update': True  # Flag to indicate update mode
-#                 },
-#                 template_name='account/teacher/profile.html'
-#             )
-#         logger.info(f"Retrieved profile for {user.email}")
-#         return Response(serializer.data)
-
-#     def post(self, request):  # Using POST for HTML form submission
-#         user = request.user
-#         profile = user.get_profile()
-#         if not profile:
-#             logger.warning(f"No profile found for {user.email}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.error(request, "Profile not found.")
-#                 return redirect('dashboard')
-#             return Response(
-#                 {"error": "Profile not found"},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-
-#         # Build Python dict for HTML form data
-#         if request.accepted_renderer.format == 'html':
-#             raw = request.POST
-#             python_data = {
-#                 'phone_number': raw.get('phone_number', '').strip(),
-#                 'date_of_birth': raw.get('date_of_birth', '').strip() or None,
-#                 'gender': raw.get('gender', '').strip() or None,
-#             }
-#             if user.role == User.Role.STUDENT:
-#                 python_data.update({
-#                     'grade_level': raw.get('grade_level', '').strip() or None,
-#                     'parent_email': raw.get('parent_email', '').strip() or None,
-#                 })
-#             else:
-#                 python_data.update({
-#                     'department': raw.get('department', '').strip() or None,
-#                     'office_number': raw.get('office_number', '').strip() or None,
-#                     'qualifications': raw.get('qualifications', '').strip() or None,
-#                 })
-#             # Handle avatar file
-#             if 'avatar' in request.FILES:
-#                 python_data['avatar'] = request.FILES['avatar']
-#         else:
-#             python_data = request.data  # JSON API: Already a dict
-
-#         serializer = (
-#             StudentProfileSerializer(profile, data=python_data, partial=True)
-#             if user.role == User.Role.STUDENT
-#             else TeacherProfileSerializer(profile, data=python_data, partial=True)
-#         )
-
-#         if serializer.is_valid():
-#             serializer.save()
-#             logger.info(f"Updated profile for {user.email}")
-#             if request.accepted_renderer.format == 'html':
-#                 messages.success(request, "Profile updated successfully.")
-#                 return redirect('profile_view')  # Redirect to profile view
-#             return Response(serializer.data)
-
-#         logger.warning(f"Profile update failed for {user.email}: {serializer.errors}")
-#         if request.accepted_renderer.format == 'html':
-#             return Response(
-#                 {
-#                     'user': user,
-#                     'profile': profile,
-#                     'form_data': python_data,
-#                     'errors': serializer.errors,
-#                     'is_update': True
-#                 },
-#                 template_name='account/teacher/profile.html',
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -975,7 +580,7 @@ class ProfileView(APIView):
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ProfileUpdateView(APIView):
-    permission_classes = [IsAuthenticated,IsVerifiedTeacher,IsApprovedTeacher]
+    permission_classes = [IsAuthenticated,IsVerified,IsApprovedTeacher]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
     renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
 
@@ -1009,7 +614,7 @@ class ProfileUpdateView(APIView):
             'user': user_serializer.data,
             'profile': serializer.data
         })
-
+    
     def post(self, request):
         user = request.user
         profile = user.get_profile()
@@ -1019,14 +624,13 @@ class ProfileUpdateView(APIView):
                 messages.error(request, "Profile not found.")
                 return redirect('home')
             return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        # Data extraction for both HTML and API
         if request.accepted_renderer.format == 'html':
             raw = request.POST
-            user_data = {}
-            if raw.get('first_name') or raw.get('last_name'):
-                user_data = {
-                    'first_name': raw.get('first_name', '').strip() or None,
-                    'last_name': raw.get('last_name', '').strip() or None,
-                }
+            user_data = {
+                'first_name': raw.get('first_name', '').strip() or None,
+                'last_name': raw.get('last_name', '').strip() or None,
+            }
             profile_data = {
                 'phone_number': raw.get('phone_number', '').strip() or None,
                 'date_of_birth': raw.get('date_of_birth', '').strip() or None,
@@ -1046,10 +650,36 @@ class ProfileUpdateView(APIView):
             if 'avatar' in request.FILES:
                 profile_data['avatar'] = request.FILES['avatar']
         else:
-            user_data = request.data.get('user', {})
-            profile_data = request.data.get('profile', {})
-        logger.debug(f"User data: {user_data}")
-        logger.debug(f"Profile data: {profile_data}")
+            data = request.data
+            user_data = data.get('user', {})
+            if not user_data:
+                user_data = {
+                    'first_name': data.get('first_name', '').strip() or None,
+                    'last_name': data.get('last_name', '').strip() or None,
+                }
+            profile_data = data.get('profile', {})
+            if not profile_data:
+                profile_data = {
+                    'phone_number': data.get('phone_number', '').strip() or None,
+                    'date_of_birth': data.get('date_of_birth', '').strip() or None,
+                    'gender': data.get('gender', '').strip() or None,
+                }
+                if user.role == User.Role.STUDENT:
+                    profile_data.update({
+                        'grade_level': data.get('grade_level', '').strip() or None,
+                        'parent_email': data.get('parent_email', '').strip() or None,
+                    })
+                else:
+                    profile_data.update({
+                        'department': data.get('department', '').strip() or None,
+                        'office_number': data.get('office_number', '').strip() or None,
+                        'qualifications': data.get('qualifications', '').strip() or None,
+                    })
+                if 'avatar' in request.FILES:
+                    profile_data['avatar'] = request.FILES['avatar']
+                elif 'avatar' in data:
+                    profile_data['avatar'] = data['avatar']
+        # Common validation/saving logic for both HTML and API
         is_valid = True
         if user_data:
             user_serializer = UserUpdateSerializer(user, data=user_data, partial=True)
@@ -1060,7 +690,8 @@ class ProfileUpdateView(APIView):
                 logger.error(f"User update errors: {user_serializer.errors}")
         profile_serializer = (
             StudentProfileSerializer(profile, data=profile_data, partial=True)
-            if user.role == User.Role.STUDENT else TeacherProfileSerializer(profile, data=profile_data, partial=True)
+            if user.role == User.Role.STUDENT 
+            else TeacherProfileSerializer(profile, data=profile_data, partial=True)
         )
         if profile_serializer.is_valid():
             profile_serializer.save()
@@ -1076,6 +707,7 @@ class ProfileUpdateView(APIView):
                 'user': user_serializer.data if user_data else UserUpdateSerializer(user).data,
                 'profile': profile_serializer.data
             })
+        # Error handling for both formats
         logger.error(f"Combined errors: {user_serializer.errors if user_data else {}} | {profile_serializer.errors}")
         if request.accepted_renderer.format == 'html':
             return Response(
@@ -1090,7 +722,11 @@ class ProfileUpdateView(APIView):
                 template_name='accounts/profile.html',
                 status=status.HTTP_400_BAD_REQUEST
             )
-        return Response({**(user_serializer.errors if user_data else {}), **profile_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {**(user_serializer.errors if user_data else {}), **profile_serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
 
     # def post(self, request):
     #     user = request.user
@@ -1101,6 +737,7 @@ class ProfileUpdateView(APIView):
     #             messages.error(request, "Profile not found.")
     #             return redirect('home')
     #         return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
+    #     # Determine data extraction based on format
     #     if request.accepted_renderer.format == 'html':
     #         raw = request.POST
     #         user_data = {
@@ -1112,6 +749,7 @@ class ProfileUpdateView(APIView):
     #             'date_of_birth': raw.get('date_of_birth', '').strip() or None,
     #             'gender': raw.get('gender', '').strip() or None,
     #         }
+    #         # Role-specific fields
     #         if user.role == User.Role.STUDENT:
     #             profile_data.update({
     #                 'grade_level': raw.get('grade_level', '').strip() or None,
@@ -1123,59 +761,99 @@ class ProfileUpdateView(APIView):
     #                 'office_number': raw.get('office_number', '').strip() or None,
     #                 'qualifications': raw.get('qualifications', '').strip() or None,
     #             })
+    #         # Handle avatar for HTML
     #         if 'avatar' in request.FILES:
     #             profile_data['avatar'] = request.FILES['avatar']
     #     else:
-    #         user_data = request.data.get('user', {})
-    #         profile_data = request.data.get('profile', {})
-    #     logger.debug(f"User data: {user_data}")
-    #     logger.debug(f"Profile data: {profile_data}")
-
-    #     user_serializer = UserUpdateSerializer(user, data=user_data, partial=True)
-    #     profile_serializer = (
-    #         StudentProfileSerializer(profile, data=profile_data, partial=True)
-    #         if user.role == User.Role.STUDENT else TeacherProfileSerializer(profile, data=profile_data, partial=True)
-    #     )
-    #     is_valid = True
-    #     if user_serializer.is_valid():
-    #         user_serializer.save()
-    #     else:
-    #         is_valid = False
-    #         logger.warning(f"User update failed for innumerable {user.email}: {user_serializer.errors}")
-    #     if profile_serializer.is_valid():
-    #         profile_serializer.save()
-    #     else:
-    #         is_valid = False
-    #         logger.warning(f"Profile update failed for {user.email}: {profile_serializer.errors}")
-    #     if is_valid:
-    #         logger.info(f"Updated profile for {user.email}")
-    #         if request.accepted_renderer.format == 'html':
-    #             messages.success(request, "Profile updated successfully.")
-    #             return redirect('profile')
-    #         return Response({
-    #             'user': user_serializer.data,
-    #             'profile': profile_serializer.data
-    #         })
-    #     if request.accepted_renderer.format == 'html':
-    #         return Response(
-    #             {
-    #                 'user': user,
-    #                 'profile': profile,
-    #                 'user_data': user_data,
-    #                 'profile_data': profile_data,
-    #                 'errors': {**user_serializer.errors, **profile_serializer.errors},
-    #                 'is_update': True
-    #             },
-    #             template_name='accounts/profile.html',
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
-    #     return Response({**user_serializer.errors, **profile_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    #     # For API requests, handle both nested and flat data
+    #             data = request.data
+    #             # Extract user data (nested or flat)
+    #             user_data = data.get('user', {})
+    #             if not user_data:
+    #                 user_data = {
+    #                     'first_name': data.get('first_name', '').strip() or None,
+    #                     'last_name': data.get('last_name', '').strip() or None,
+    #                 }
+    #             # Extract profile data (nested or flat)
+    #             profile_data = data.get('profile', {})
+    #             if not profile_data:
+    #                 profile_data = {
+    #                     'phone_number': data.get('phone_number', '').strip() or None,
+    #                     'date_of_birth': data.get('date_of_birth', '').strip() or None,
+    #                     'gender': data.get('gender', '').strip() or None,
+    #                 }
+    #                 # Role-specific fields
+    #                 if user.role == User.Role.STUDENT:
+    #                     profile_data.update({
+    #                         'grade_level': data.get('grade_level', '').strip() or None,
+    #                         'parent_email': data.get('parent_email', '').strip() or None,
+    #                     })
+    #                 else:
+    #                     profile_data.update({
+    #                         'department': data.get('department', '').strip() or None,
+    #                         'office_number': data.get('office_number', '').strip() or None,
+    #                         'qualifications': data.get('qualifications', '').strip() or None,
+    #                     })
+    #                 # Handle avatar for API (using multipart/form-data)
+    #                 if 'avatar' in request.FILES:
+    #                     profile_data['avatar'] = request.FILES['avatar']
+    #                 # Handle avatar from data (e.g., base64 encoded)
+    #                 elif 'avatar' in data:
+    #                     profile_data['avatar'] = data['avatar']
+    #             # Log extracted data
+    #             logger.debug(f"User data: {user_data}")
+    #             logger.debug(f"Profile data: {profile_data}")
+    #             # Rest of the code remains the same for validation and saving...
+    #             is_valid = True
+    #             if user_data:
+    #                 print(user_data)
+    #                 user_serializer = UserUpdateSerializer(user, data=user_data, partial=True)
+    #                 if user_serializer.is_valid():
+    #                     user_serializer.save()
+    #                 else:
+    #                     is_valid = False
+    #                     logger.error(f"User update errors: {user_serializer.errors}")
+    #             profile_serializer = (
+    #                 StudentProfileSerializer(profile, data=profile_data, partial=True)
+    #                 if user.role == User.Role.STUDENT else TeacherProfileSerializer(profile, data=profile_data, partial=True)
+    #             )
+    #             if profile_serializer.is_valid():
+    #                 profile_serializer.save()
+    #             else:
+    #                 is_valid = False
+    #                 logger.error(f"Profile update errors: {profile_serializer.errors}")
+    #             if is_valid:
+    #                 logger.info(f"Updated profile for {user.email}")
+    #                 if request.accepted_renderer.format == 'html':
+    #                     messages.success(request, "Profile updated successfully.")
+    #                     return redirect('profile')
+    #                 return Response({
+    #                     'user': user_serializer.data if user_data else UserUpdateSerializer(user).data,
+    #                     'profile': profile_serializer.data
+    #                 })
+    #             logger.error(f"Combined errors: {user_serializer.errors if user_data else {}} | {profile_serializer.errors}")
+    #             if request.accepted_renderer.format == 'html':
+    #                 return Response(
+    #                     {
+    #                         'user': user,
+    #                         'profile': profile,
+    #                         'user_data': user_data,
+    #                         'profile_data': profile_data,
+    #                         'errors': {**(user_serializer.errors if user_data else {}), **profile_serializer.errors},
+    #                         'is_update': True
+    #                     },
+    #                     template_name='accounts/profile.html',
+    #                     status=status.HTTP_400_BAD_REQUEST
+    #                 )
+    #             return Response({**(user_serializer.errors if user_data else {}), **profile_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    
 
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ApprovalRequestView(APIView):
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
     permission_classes = [IsAuthenticated, IsTeacher]
+    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
 
     def get(self, request):
         # Check for pending or rejected requests
@@ -1236,49 +914,3 @@ class ApprovalRequestView(APIView):
                 )
             return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-# @method_decorator(ensure_csrf_cookie, name='dispatch')
-# class ApprovalRequestView(APIView):
-#     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
-#     permission_classes = [IsAuthenticated, IsTeacher]
-
-#     def get(self, request):
-#         approval_request = ApprovalRequest.objects.filter(user=request.user, status=ApprovalRequest.Status.PENDING).first()
-#         serializer = ApprovalRequestSerializer(approval_request)
-#         if request.accepted_renderer.format == 'html':
-#             return Response(
-#                 {'approval_request': serializer.data if serializer else None},
-#                 template_name='accounts/approval_request.html'
-#             )
-#         return Response(
-#             {'approval_request': serializer.data if serializer else None},
-#             status=status.HTTP_200_OK
-#         )
-
-#     def post(self, request):
-#         pending_request = ApprovalRequest.objects.filter(user=request.user, status=ApprovalRequest.Status.PENDING).first()
-#         if pending_request:
-#             serializer = ApprovalRequestSerializer(pending_request, data=request.data)
-#         else:
-#             serializer = ApprovalRequestSerializer(data=request.data, context={'request': request})
-        
-#         if serializer.is_valid():
-#             approval_request = serializer.save(user=request.user)
-#             logger.info("Approval request submitted for user: %s", request.user.username)
-#             send_approval_request_notification.delay(approval_request.id)
-
-#             if request.accepted_renderer.format == 'html':
-#                 messages.success(request, "Your credentials have been submitted for approval.")
-#                 return redirect('profile')
-#             return Response(
-#                 {"message": "Credentials submitted successfully."},
-#                 status=status.HTTP_201_CREATED
-#             )
-#         else:
-#             logger.warning("Approval request validation errors: %s", serializer.errors)
-#             if request.accepted_renderer.format == 'html':
-#                 return Response(
-#                     {"errors": serializer.errors, "form_data": request.data},
-#                     template_name='accounts/approval_request.html',
-#                     status=status.HTTP_400_BAD_REQUEST
-#                 )
-#             return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)

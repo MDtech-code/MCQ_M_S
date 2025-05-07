@@ -59,7 +59,8 @@
 
 <body class="d-flex flex-column min-vh-100">
     <!-- Loader -->
-    {% include "partials/loader.html" %}
+    {% comment %} {% include "partials/loader.html" %} {% endcomment %}
+    {% include "base/restricted_modal.html" %}
 
     <!-- Modern Navbar -->
     {% include "partials/navbar.html" %}
@@ -110,6 +111,13 @@
     <script src="{% static 'js/formValidations.js' %}"></script>
     <script src="{% static 'js/passwordToggle.js' %}"></script>
     <script src="{% static 'js/loader.js' %}"></script>
+    {% comment %} scripts to triger restrited modol {% endcomment %}
+    <script>
+        function showRestrictedModal() {
+      const modal = new bootstrap.Modal(document.getElementById('restrictedModal'));
+      modal.show();
+    }
+    </script>
     
     <!-- Notification JavaScript -->
     <script>

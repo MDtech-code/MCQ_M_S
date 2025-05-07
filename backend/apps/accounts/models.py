@@ -5,7 +5,7 @@ from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction
 from django.db.models import Q
-from apps.accounts.validators import validate_phone_number
+from apps.accounts.utils.validations import validate_phone_number
 from django.db.models.functions import Lower
 from apps.common.models import TimeStampedModel
 from django.core.exceptions import ValidationError

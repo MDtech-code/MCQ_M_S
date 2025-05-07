@@ -1,17 +1,32 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver,Signal
 from .models import User, StudentProfile, TeacherProfile,EmailVerificationToken,ApprovalRequest
+from apps.accounts.tasks import send_welcome_email_task,send_verification_email_task
+
 
 import logging
-from apps.accounts.tasks import send_welcome_email_task,send_verification_email_task
 logger = logging.getLogger(__name__)
 
+
 user_signed_up = Signal()
-
-
-#Receiver for user_signed_up signal
 @receiver(user_signed_up)
 def user_signed_up_receiver(sender, user, **kwargs):
+
+    """
+    Handles the user_signed_up signal.
+
+    This function is triggered when a user successfully signs up.
+    It logs the signup event and queues a task to send a welcome email.
+    
+    Args:
+        sender (class): The sender of the signal.
+        user (User): The user instance that was created.
+        **kwargs: Additional keyword arguments passed by the signal.
+
+    Returns:
+        None
+    """
+
     logger.info(f"Received user_signed_up signal for user: {user.username} (ID: {user.id})")
     send_welcome_email_task.delay(user.id)
 
