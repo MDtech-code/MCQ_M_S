@@ -1,5 +1,7 @@
 # frontend/Dockerfile
-FROM node:18-alpine
+FROM node:18.20.4-alpine3.20
+
+WORKDIR /app
 
 WORKDIR /app
 COPY package*.json ./
