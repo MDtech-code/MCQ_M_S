@@ -15,14 +15,17 @@ class SubjectSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
 
 class TopicSerializer(serializers.ModelSerializer):
-    subject = serializers.StringRelatedField()
+    # subject = serializers.StringRelatedField()
+    subject = serializers.CharField(source='subject.name', read_only=True)
 
     class Meta:
         model = Topic
         fields = ['id', 'subject', 'name', 'difficulty_level']
 
 class QuestionSerializer(serializers.ModelSerializer):
-    topics = serializers.PrimaryKeyRelatedField(queryset=Topic.objects.all(), many=True)
+    topics = TopicSerializer(many=True, read_only=True)  # Use nested serializer
+    # topics = serializers.PrimaryKeyRelatedField(queryset=Topic.objects.all(), many=True)
+
 
     class Meta:
         model = Question

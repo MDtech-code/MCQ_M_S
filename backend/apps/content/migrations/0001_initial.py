@@ -6,6 +6,9 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
+import apps.content.utils
+import apps.content.utils.validations
+
 
 class Migration(migrations.Migration):
 
@@ -26,7 +29,7 @@ class Migration(migrations.Migration):
                 ('question_type', models.CharField(default='MCQ', max_length=50)),
                 ('difficulty', models.CharField(choices=[('E', 'Easy'), ('M', 'Medium'), ('H', 'Hard')], max_length=1)),
                 ('metadata', models.JSONField(default=dict)),
-                ('options', models.JSONField(validators=[apps.content.models.Question.validate_options])),
+                ('options', models.JSONField(validators=[apps.content.utils.validations.validate_options])),
                 ('correct_answer', models.CharField(max_length=1)),
                 ('version', models.PositiveIntegerField(default=1)),
                 ('is_active', models.BooleanField(default=True)),

@@ -101,16 +101,19 @@ def validate_difficulty(value: str) -> str:
     return value
 
 def validate_options(value: dict) -> dict:
-    """Validate options have non-empty values."""
-    if not value:
-        log_validation_error("options", value, "Options are required")
-        raise ValidationError(_('Options are required'))
+    """Validate options are correctly formatted and non-empty."""
+    
+    # Check if it's a dictionary with required keys
+    expected_keys = {'A', 'B', 'C', 'D'}
+    if not isinstance(value, dict) or set(value.keys()) != expected_keys:
+        raise ValidationError("Options must be a dict with keys A, B, C, D")
+
+    # Ensure all values are non-empty
     for key, val in value.items():
         if not val.strip():
-            log_validation_error("options", value, f"Option {key} cannot be empty")
             raise ValidationError(_('Option %(key)s cannot be empty') % {'key': key})
-    return value
 
+    return value
 def validate_source(value: str) -> str:
     """Validate source against allowed values."""
     if value not in ALLOWED_SOURCES:

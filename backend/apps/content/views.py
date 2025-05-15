@@ -15,58 +15,173 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib import messages
 from django.shortcuts import redirect, get_object_or_404
 from apps.content.utils.utils import process_question_form_data, get_subject_topic_context
+from django.db.models import Prefetch
 from django.core.cache import cache
 from datetime import datetime
-import logging
 import json
+import logging
 
 logger = logging.getLogger(__name__)
 
+
+
+def get_subject_topic_context(user):
+    cache_key = f"subject_topic_context:{user.id}"
+    context = cache.get(cache_key)
+    if not context:
+        subjects = Subject.objects.all()
+        topics = Topic.objects.select_related('subject').all()
+        context = {
+            'subjects': list(subjects),
+            'topics': list(topics)
+        }
+        cache.set(cache_key, context, timeout=86400)  # 24 hours
+        logger.debug(f"Cached subject_topic_context for user {user.id}")
+    else:
+        logger.debug(f"Cache hit for subject_topic_context for user {user.id}")
+
+    return context  
+
+
 class QuestionFilter:
-    """Centralized filter logic for QuestionListView."""
     def __init__(self, queryset, params, user):
         self.queryset = queryset
         self.params = params
         self.user = user
 
     def apply(self):
-        """Apply filters and return queryset."""
+        filters = {}
+        needs_distinct = False
+
         if difficulty := self.params.get('difficulty'):
             if difficulty not in ['E', 'M', 'H']:
                 raise ValueError("Difficulty must be E, M, or H")
-            self.queryset = self.queryset.filter(difficulty=difficulty)
+            filters['difficulty'] = difficulty
         
         if subject_id := self.params.get('subject'):
-            try:
-                Subject.objects.get(id=subject_id)
-                self.queryset = self.queryset.filter(topics__subject_id=subject_id)
-            except Subject.DoesNotExist:
-                raise ValueError("Subject not found")
+            filters['topics__subject_id'] = subject_id
+            needs_distinct = True
         
         if topic_id := self.params.get('topic'):
-            try:
-                topic = Topic.objects.get(id=topic_id)
-                if subject_id and topic.subject_id != int(subject_id):
+            if subject_id:
+                if not Topic.objects.filter(id=topic_id, subject_id=subject_id).exists():
                     raise ValueError("Topic does not belong to specified subject")
-                self.queryset = self.queryset.filter(topics__id=topic_id)
-            except Topic.DoesNotExist:
-                raise ValueError("Topic not found")
+            filters['topics__id'] = topic_id
+            needs_distinct = True
         
         if status := self.params.get('status'):
             if self.user.role == 'TE':
                 if status not in ['PENDING', 'APPROVED', 'REJECTED']:
                     raise ValueError("Status must be PENDING, APPROVED, or REJECTED")
-                self.queryset = self.queryset.filter(approval__status=status)
+                filters['approval__status'] = status
         
         if created_after := self.params.get('created_after'):
             try:
                 datetime.strptime(created_after, '%Y-%m-%d')
-                self.queryset = self.queryset.filter(created_at__gte=created_after)
+                filters['created_at__gte'] = created_after
             except ValueError:
                 raise ValueError("Invalid date format for created_after")
         
-        return self.queryset.distinct()
+        queryset = self.queryset.filter(**filters)
+        return queryset.distinct() if needs_distinct else queryset
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
+class QuestionListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
+    renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
+    throttle_classes = [CustomUserRateThrottle]
+
+    def get(self, request):
+        if not request.user.is_active:
+            logger.warning(f"Inactive user {request.user.email} attempted to list questions")
+            if request.accepted_renderer.format == 'html':
+                messages.error(request, "Your account is inactive.")
+                return redirect('public:teacher_dashboard')
+            return Response({"error": "Inactive account"}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Cache user object
+        # cache_key_user = f"user:{request.user.id}"
+        # cached_user = cache.get(cache_key_user)
+        # if not cached_user:
+        #     cache.set(cache_key_user, request.user, timeout=3600)  # 1 hour
+        #     logger.debug(f"Cached user {request.user.id}")
+
+        # Role-based queryset
+        if request.user.role == 'ST':
+            queryset = Question.objects.filter(is_active=True).select_related('created_by').prefetch_related('topics')
+            print(queryset)
+        elif request.user.role == 'TE':
+            queryset = Question.objects.filter(created_by=request.user).select_related('created_by', 'approval').prefetch_related(Prefetch('topics', queryset=Topic.objects.select_related('subject')))
+        else:
+            logger.warning(f"Invalid role {request.user.role} for {request.user.email}")
+            if request.accepted_renderer.format == 'html':
+                messages.error(request, "Invalid role.")
+                return redirect('public:teacher_dashboard')
+            return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Apply filters
+        try:
+            question_filter = QuestionFilter(queryset, request.query_params, request.user)
+            queryset = question_filter.apply()
+        except ValueError as e:
+            logger.warning(f"Invalid filter for {request.user.email}: {str(e)}")
+            if request.accepted_renderer.format == 'html':
+                messages.error(request, str(e))
+                return redirect('question_list')
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Pagination
+        paginator = Paginator(queryset, 20)
+        page = request.query_params.get('page', 1)
+        try:
+            questions = paginator.page(page)
+        except EmptyPage:
+            logger.warning(f"Invalid page {page} for question list by {request.user.email}")
+            if request.accepted_renderer.format == 'html':
+                messages.error(request, "Page not found.")
+                return redirect('question_list')
+            return Response({"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Caching
+        cache_key = f"question_list:{request.user.id}:{request.user.role}:{hash(str(request.query_params))}:{page}"
+        # cache_key = f"question_list:{request.user.id}:{request.query_params.get('difficulty')}:{request.query_params.get('subject')}:{request.query_params.get('topic')}:{request.query_params.get('status')}:{request.query_params.get('created_after')}:{page}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.debug(f"Cache hit for {cache_key}")
+            if request.accepted_renderer.format == 'html':
+                context = get_subject_topic_context(request.user)
+                return Response(
+                    {
+                        'count': cached_data['count'],
+                        'results': questions,
+                        **context,
+                        'current_filters': request.query_params
+                    },
+                    template_name='content/teacher/question_list.html'
+                )
+            return Response(cached_data)
+
+        serializer = QuestionSerializer(questions, many=True)
+        response_data = {
+            "count": paginator.count,
+            "results": serializer.data
+        }   
+        cache.set(cache_key, response_data, timeout=3600)  # 1 hour
+        logger.info(f"Question list retrieved by {request.user.email} (role: {request.user.role})")
+
+        if request.accepted_renderer.format == 'html':
+            context = get_subject_topic_context(request.user)
+            return Response(
+                {
+                    'count': response_data['count'],
+                    'results': questions,
+                    **context,
+                    'current_filters': request.query_params
+                },
+                template_name='content/teacher/question_list.html'
+            )
+        return Response(response_data)
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class QuestionCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsTeacher]
@@ -126,94 +241,7 @@ class QuestionCreateView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@method_decorator(ensure_csrf_cookie, name='dispatch')
-class QuestionListView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-    renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
-    throttle_classes = [CustomUserRateThrottle]
 
-    def get(self, request):
-        if not request.user.is_active:
-            logger.warning(f"Inactive user {request.user.email} attempted to list questions")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, "Your account is inactive.")
-                return redirect('public:teacher_dashboard')
-            return Response({"error": "Inactive account"}, status=status.HTTP_403_FORBIDDEN)
-
-        # Role-based queryset
-        if request.user.role == 'ST':
-            queryset = Question.objects.filter(is_active=True).select_related('created_by').prefetch_related('topics')
-        elif request.user.role == 'TE':
-            queryset = Question.objects.filter(created_by=request.user).select_related('created_by', 'approval').prefetch_related('topics')
-        else:
-            logger.warning(f"Invalid role {request.user.role} for {request.user.email}")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, "Invalid role.")
-                return redirect('public:teacher_dashboard')
-            return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
-
-        # Apply filters
-        try:
-            question_filter = QuestionFilter(queryset, request.query_params, request.user)
-            queryset = question_filter.apply()
-        except ValueError as e:
-            logger.warning(f"Invalid filter for {request.user.email}: {str(e)}")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, str(e))
-                return redirect('question_list')
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Pagination
-        paginator = Paginator(queryset, 20)
-        page = request.query_params.get('page', 1)
-        try:
-            questions = paginator.page(page)
-        except EmptyPage:
-            logger.warning(f"Invalid page {page} for question list by {request.user.email}")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, "Page not found.")
-                return redirect('question_list')
-            return Response({"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Caching
-        cache_key = f"question_list:{request.user.id}:{request.query_params.get('difficulty')}:{request.query_params.get('subject')}:{request.query_params.get('topic')}:{request.query_params.get('status')}:{request.query_params.get('created_after')}:{page}"
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            logger.debug(f"Cache hit for {cache_key}")
-            if request.accepted_renderer.format == 'html':
-                context = get_subject_topic_context(request.user)
-                return Response(
-                    {
-                        'count': cached_data['count'],
-                        'results': questions,
-                        **context,
-                        'current_filters': request.query_params
-                    },
-                    template_name='content/teacher/question_list.html'
-                )
-            return Response(cached_data)
-
-        serializer = QuestionSerializer(questions, many=True)
-        response_data = {
-            "count": paginator.count,
-            "results": serializer.data
-        }
-        cache.set(cache_key, response_data, timeout=3600)  # 1 hour
-        logger.info(f"Question list retrieved by {request.user.email} (role: {request.user.role})")
-
-        if request.accepted_renderer.format == 'html':
-            context = get_subject_topic_context(request.user)
-            return Response(
-                {
-                    'count': paginator.count,
-                    'results': questions,
-                    **context,
-                    'current_filters': request.query_params
-                },
-                template_name='content/teacher/question_list.html'
-            )
-        return Response(response_data)
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class QuestionUpdateView(APIView):
