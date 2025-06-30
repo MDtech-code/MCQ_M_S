@@ -1,21 +1,4 @@
-# from django.shortcuts import render
 
-
-
-
-# # Create your views here.
-# def index_view(request):
-#     return render(request, "home/home.html")
-
-# def teacher_landing(request):
-#     return render(request, "home/landing/teacher_landing.html")
-
-# def student_landing(request):
-#     return render(request, "home/landing/student_landing.html")
-# def contact_view(request):
-#     return render(request, "pages/contact.html")
-# def about_view(request):
-#     return render(request, "pages/about.html")
 
 # apps/public/views.py
 from django.shortcuts import render
@@ -56,7 +39,7 @@ class PublicHomeView(APIView):
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class TeacherDashboardView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsTeacher]
+    permission_classes = [IsAuthenticated, IsTeacher]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
     renderer_classes = [TemplateHTMLRenderer]
 

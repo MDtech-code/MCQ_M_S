@@ -17,7 +17,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.renderers import JSONRenderer, TemplateHTMLRenderer
 from django.contrib import messages
-from apps.common.permissions import IsTeacher,IsStudent,IsApprovedTeacher,IsAdmin,IsVerified,IsNotAuthenticated
+from apps.common.permissions import IsTeacher,IsStudent,IsApprovedTeacher,IsAdmin,IsVerified,IsNotAuthenticated,RoleBasedProfilePermission
 
 import logging
 logger = logging.getLogger(__name__)
@@ -214,8 +214,7 @@ class LogoutView(APIView):
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class VerifyEmailView(APIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieTokenAuthentication,SessionAuthentication]
+    permission_classes = [AllowAny]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
     def get(self, request, token):
@@ -226,14 +225,15 @@ class VerifyEmailView(APIView):
         try:
             
             token_obj = EmailVerificationToken.objects.get(token=token)
-            login(request, request.user,backend='apps.accounts.backends.EmailOrUsernameBackend')
+            user = token_obj.user
+
+            # validate token expiry
             if not token_obj.is_valid():
                 logger.warning(f"Expired token {token} for {token_obj.user.email}")
                 if request.accepted_renderer.format == 'html':
                     messages.error(request, "Verification link has expired.")
                     return Response({},template_name='accounts/verify_email.html', status=status.HTTP_400_BAD_REQUEST)
                 return Response({"error": "Token has expired"}, status=status.HTTP_400_BAD_REQUEST)
-            user = token_obj.user
             originally_verified=user.is_verified
             if token_obj.new_email:
                 user.email = token_obj.new_email
@@ -245,6 +245,9 @@ class VerifyEmailView(APIView):
 
             user.save()
             token_obj.delete()
+            login(request, user, backend='apps.accounts.backends.EmailOrUsernameBackend')
+
+
             if originally_verified and  not token_obj.new_email:
                 print('mia triger ho gai')
                 logger.info(f"Email already verified for {user.email}")
@@ -580,7 +583,7 @@ class ProfileView(APIView):
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ProfileUpdateView(APIView):
-    permission_classes = [IsAuthenticated,IsVerified,IsApprovedTeacher]
+    permission_classes = [IsAuthenticated,RoleBasedProfilePermission]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
     renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
 
@@ -728,124 +731,7 @@ class ProfileUpdateView(APIView):
         )
 
 
-    # def post(self, request):
-    #     user = request.user
-    #     profile = user.get_profile()
-    #     if not profile:
-    #         logger.warning(f"No profile found for {user.email}")
-    #         if request.accepted_renderer.format == 'html':
-    #             messages.error(request, "Profile not found.")
-    #             return redirect('home')
-    #         return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
-    #     # Determine data extraction based on format
-    #     if request.accepted_renderer.format == 'html':
-    #         raw = request.POST
-    #         user_data = {
-    #             'first_name': raw.get('first_name', '').strip() or None,
-    #             'last_name': raw.get('last_name', '').strip() or None,
-    #         }
-    #         profile_data = {
-    #             'phone_number': raw.get('phone_number', '').strip() or None,
-    #             'date_of_birth': raw.get('date_of_birth', '').strip() or None,
-    #             'gender': raw.get('gender', '').strip() or None,
-    #         }
-    #         # Role-specific fields
-    #         if user.role == User.Role.STUDENT:
-    #             profile_data.update({
-    #                 'grade_level': raw.get('grade_level', '').strip() or None,
-    #                 'parent_email': raw.get('parent_email', '').strip() or None,
-    #             })
-    #         else:
-    #             profile_data.update({
-    #                 'department': raw.get('department', '').strip() or None,
-    #                 'office_number': raw.get('office_number', '').strip() or None,
-    #                 'qualifications': raw.get('qualifications', '').strip() or None,
-    #             })
-    #         # Handle avatar for HTML
-    #         if 'avatar' in request.FILES:
-    #             profile_data['avatar'] = request.FILES['avatar']
-    #     else:
-    #     # For API requests, handle both nested and flat data
-    #             data = request.data
-    #             # Extract user data (nested or flat)
-    #             user_data = data.get('user', {})
-    #             if not user_data:
-    #                 user_data = {
-    #                     'first_name': data.get('first_name', '').strip() or None,
-    #                     'last_name': data.get('last_name', '').strip() or None,
-    #                 }
-    #             # Extract profile data (nested or flat)
-    #             profile_data = data.get('profile', {})
-    #             if not profile_data:
-    #                 profile_data = {
-    #                     'phone_number': data.get('phone_number', '').strip() or None,
-    #                     'date_of_birth': data.get('date_of_birth', '').strip() or None,
-    #                     'gender': data.get('gender', '').strip() or None,
-    #                 }
-    #                 # Role-specific fields
-    #                 if user.role == User.Role.STUDENT:
-    #                     profile_data.update({
-    #                         'grade_level': data.get('grade_level', '').strip() or None,
-    #                         'parent_email': data.get('parent_email', '').strip() or None,
-    #                     })
-    #                 else:
-    #                     profile_data.update({
-    #                         'department': data.get('department', '').strip() or None,
-    #                         'office_number': data.get('office_number', '').strip() or None,
-    #                         'qualifications': data.get('qualifications', '').strip() or None,
-    #                     })
-    #                 # Handle avatar for API (using multipart/form-data)
-    #                 if 'avatar' in request.FILES:
-    #                     profile_data['avatar'] = request.FILES['avatar']
-    #                 # Handle avatar from data (e.g., base64 encoded)
-    #                 elif 'avatar' in data:
-    #                     profile_data['avatar'] = data['avatar']
-    #             # Log extracted data
-    #             logger.debug(f"User data: {user_data}")
-    #             logger.debug(f"Profile data: {profile_data}")
-    #             # Rest of the code remains the same for validation and saving...
-    #             is_valid = True
-    #             if user_data:
-    #                 print(user_data)
-    #                 user_serializer = UserUpdateSerializer(user, data=user_data, partial=True)
-    #                 if user_serializer.is_valid():
-    #                     user_serializer.save()
-    #                 else:
-    #                     is_valid = False
-    #                     logger.error(f"User update errors: {user_serializer.errors}")
-    #             profile_serializer = (
-    #                 StudentProfileSerializer(profile, data=profile_data, partial=True)
-    #                 if user.role == User.Role.STUDENT else TeacherProfileSerializer(profile, data=profile_data, partial=True)
-    #             )
-    #             if profile_serializer.is_valid():
-    #                 profile_serializer.save()
-    #             else:
-    #                 is_valid = False
-    #                 logger.error(f"Profile update errors: {profile_serializer.errors}")
-    #             if is_valid:
-    #                 logger.info(f"Updated profile for {user.email}")
-    #                 if request.accepted_renderer.format == 'html':
-    #                     messages.success(request, "Profile updated successfully.")
-    #                     return redirect('profile')
-    #                 return Response({
-    #                     'user': user_serializer.data if user_data else UserUpdateSerializer(user).data,
-    #                     'profile': profile_serializer.data
-    #                 })
-    #             logger.error(f"Combined errors: {user_serializer.errors if user_data else {}} | {profile_serializer.errors}")
-    #             if request.accepted_renderer.format == 'html':
-    #                 return Response(
-    #                     {
-    #                         'user': user,
-    #                         'profile': profile,
-    #                         'user_data': user_data,
-    #                         'profile_data': profile_data,
-    #                         'errors': {**(user_serializer.errors if user_data else {}), **profile_serializer.errors},
-    #                         'is_update': True
-    #                     },
-    #                     template_name='accounts/profile.html',
-    #                     status=status.HTTP_400_BAD_REQUEST
-    #                 )
-    #             return Response({**(user_serializer.errors if user_data else {}), **profile_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+  
     
 
 

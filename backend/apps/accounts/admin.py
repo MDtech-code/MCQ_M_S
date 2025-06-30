@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import User, StudentProfile, TeacherProfile, ApprovalRequest
+from .models import User, StudentProfile, TeacherProfile, ApprovalRequest,EmailVerificationToken, PasswordResetToken
 from .tasks import send_teacher_approval_email_task
 
 class StudentProfileInline(admin.StackedInline):
@@ -105,3 +105,19 @@ class ApprovalRequestAdmin(admin.ModelAdmin):
             count += 1
         self.message_user(request, f"{count} request(s) rejected successfully.")
     reject_requests.short_description = "Reject selected requests"
+
+
+
+
+
+@admin.register(EmailVerificationToken)
+class EmailVerificationTokenAdmin(admin.ModelAdmin):
+    list_display = ('user', 'token', 'expires_at', 'new_email')
+    list_filter = ('expires_at',)
+    search_fields = ('user__username', 'user__email', 'token', 'new_email')
+
+@admin.register(PasswordResetToken)
+class PasswordResetTokenAdmin(admin.ModelAdmin):
+    list_display = ('user', 'token', 'expires_at')
+    list_filter = ('expires_at',)
+    search_fields = ('user__username', 'user__email', 'token')

@@ -1,9 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, Group, Permission
-from django.contrib.auth.validators import ASCIIUsernameValidator
-
 from django.utils.translation import gettext_lazy as _
-from django.db import transaction
 from django.db.models import Q
 from apps.accounts.utils.validations import validate_phone_number
 from django.db.models.functions import Lower
@@ -26,12 +23,10 @@ class User(AbstractUser):
         TEACHER = 'TE', _('Teacher')
         ADMIN = 'AD', _('Admin')
     
-    # Authentication fields
     username = models.CharField(
         _('username'),
         max_length=150,
         unique=True,
-        validators=[ASCIIUsernameValidator()],   # Explicit validator
         help_text=_('Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.')
     )
     email = models.EmailField(
@@ -54,7 +49,7 @@ class User(AbstractUser):
 
     is_approved = models.BooleanField(
         _('approved status'),
-        default=True,  # Students/Admins default approved
+        default=True,
         help_text=_('Designates whether the user (teacher) is approved by admin')
     )
     

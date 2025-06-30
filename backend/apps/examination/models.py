@@ -24,6 +24,13 @@ class Test(TimeStampedModel):
     def validate(self):
         if not self.subject and not self.subjects.exists():
             raise ValidationError("Test must have at least one subject")
+    
+    @property
+    def percent_attempted(self):
+        if not self.max_attempts:
+            return 0
+        return (self.user_attempt_count / self.max_attempts) * 100
+
         
     @property
     def attempt_percentage(self):
@@ -64,6 +71,7 @@ class TestAttempt(TimeStampedModel):
     end_time = models.DateTimeField(null=True, blank=True)
     score = models.FloatField(null=True, blank=True)
     
+    
     # Store calculated analytics for quick access
     def validate_performance_metrics(value):
         if not isinstance(value, dict):
@@ -92,17 +100,7 @@ class TestAttempt(TimeStampedModel):
         correct_count = responses.filter(is_correct=True).count()
         scoring_scheme = self.test.scoring_scheme or {'correct': 1, 'incorrect': 0}
         self.score = correct_count * scoring_scheme['correct']
-    # def calculate_score(self):
-    #     responses = self.studentresponse_set.all()
-    #     score = 0
-    #     for response in responses:
-    #         if response.is_correct:
-    #             score += self.test.scoring_scheme.get('correct', 1)
-    #         else:
-    #             score += self.test.scoring_scheme.get('incorrect', 0)
-    #     self.score = score
-    #     self.save()
-    #     return score
+   
     
     def __str__(self):
         return f"{self.student.email} - {self.test.title}"
@@ -110,7 +108,7 @@ class TestAttempt(TimeStampedModel):
 class StudentResponse(TimeStampedModel):
     attempt = models.ForeignKey(TestAttempt, on_delete=models.CASCADE)
     question = models.ForeignKey('content.Question', on_delete=models.CASCADE)
-    selected_answer = models.CharField(max_length=1)
+    selected_answer = models.CharField(max_length=1,blank=True,null=True)
     is_correct = models.BooleanField()
     time_taken = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     

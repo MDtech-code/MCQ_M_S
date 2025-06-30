@@ -134,7 +134,7 @@ def send_password_reset_email_task(user_id, token):
             logger.warning(f"Expired reset token for {user.email}")
             return
         # reset_url = f"{settings.FRONTEND_URL}{reverse('reset_password')}?token={token}"
-        reset_url = f"{settings.FRONTEND_URL}/reset-password/{token}/"
+        reset_url = f"{settings.FRONTEND_URL}/api/reset-password/{token}/"
         subject = "Reset Your Password"
         message = (
             f"Hi {user.username},\n\n"
@@ -208,9 +208,19 @@ def send_approval_request_notification(self, approval_request_id):
             logger.warning("No active admins found to receive approval request notification.")
             return
 
+        # 1) reverse the admin changelist for ApprovalRequest
+        changelist = reverse('admin:accounts_approvalrequest_changelist')
+        # 2) build a login URL that sends the admin straight there
+        login_with_next = (
+            f"{settings.FRONTEND_URL.rstrip('/')}/admin/login/"
+            f"?next={changelist}"
+        )
+
         subject = "New Teacher Approval Request"
         html_message = render_to_string('accounts/new_approval_request.html', {
             'approval_request': approval_request,
+            'admin_login_url': login_with_next,
+
             'user': approval_request.user
         })
 

@@ -140,7 +140,7 @@
                         <!-- Topics -->
                         <div class="mb-5">
                             <div class="form-floating">
-                                <select class="form-select select2" id="topics" name="topics" multiple required>
+                                <select class="form-select " id="topics" name="topics" multiple required>
                                     {% for topic in topics %}
                                         <option value="{{ topic.id }}"
                                                 data-subject="{{ topic.subject.id }}"

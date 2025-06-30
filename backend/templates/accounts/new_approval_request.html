@@ -36,7 +36,8 @@
             <p><strong>Submitted:</strong> {{ approval_request.created_at|date:"F d, Y H:i" }}</p>
         </div>
         
-        <a href="{{ FRONTEND_URL }}{% url 'admin:accounts_approvalrequest_changelist' %}" class="button">Review in Admin Panel</a>
+       
+        <a href="{{ admin_login_url }}" class="button">Review in Admin Panel</a>
         
         <div class="footer">
             <p>MCQ Master &copy; 2025. All rights reserved.</p>

@@ -5,9 +5,8 @@ from django.contrib.auth import get_user_model
 from .models import StudentProfile, TeacherProfile, ApprovalRequest
 from apps.accounts.utils.validations import (
     validate_phone_number, validate_date_of_birth, validate_gender, validate_avatar,
-    validate_parent_email, validate_grade_level, validate_department,
-    validate_office_number, validate_qualifications, validate_first_name,
-    validate_last_name, validate_username, validate_password_strength
+    validate_email, validate_grade_level, validate_department,
+     validate_qualifications, validate_password_strength,validate_person_name
 )
 from django.utils.translation import gettext_lazy as _
 
@@ -33,11 +32,19 @@ class UserSerializer(serializers.ModelSerializer):
             'role': {'required': True}
         }
     
+    def validate_email(self,value):
+        
+        """
+        Validate email using centerlized validator 
+        """
+        value=validate_email(value,field_name='email')
+        return value
+    
     def validate_username(self, value):
         """
         Validate username using centralized validator and check uniqueness.
         """
-        value = validate_username(value)
+        value= validate_person_name(value,field_name='username')
         if User.objects.filter(username__iexact=value).exclude(pk=self.instance.pk if self.instance else None).exists():
             logger.warning("Username already in use: %s", value)
             raise serializers.ValidationError(_('Username already in use'))
@@ -180,7 +187,7 @@ class UpdateEmailSerializer(serializers.Serializer):
     """
     Serializer for updating user email.
     """
-    new_email = serializers.EmailField(required=True)
+    new_email = serializers.EmailField(validators=[lambda value:validate_email(value,field_name='new_email')],required=True)
     password = serializers.CharField(required=True, write_only=True)
 
     def validate_new_email(self, value):
@@ -211,7 +218,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     gender = serializers.CharField(validators=[validate_gender], required=False, allow_blank=True, allow_null=True)
     avatar = serializers.ImageField(validators=[validate_avatar], required=False, allow_null=True)
     grade_level = serializers.CharField(validators=[validate_grade_level], required=False, allow_blank=True, allow_null=True)
-    parent_email = serializers.CharField(validators=[validate_parent_email], required=False, allow_blank=True, allow_null=True)
+    parent_email = serializers.CharField(validators=[lambda value:validate_email(value,field_name='parent_email')], required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = StudentProfile
@@ -226,7 +233,7 @@ class TeacherProfileSerializer(serializers.ModelSerializer):
     gender = serializers.CharField(validators=[validate_gender], required=False, allow_blank=True, allow_null=True)
     avatar = serializers.ImageField(validators=[validate_avatar], required=False, allow_null=True)
     department = serializers.CharField(validators=[validate_department], required=False, allow_blank=True, allow_null=True)
-    office_number = serializers.CharField(validators=[validate_office_number], required=False, allow_blank=True, allow_null=True)
+    office_number = serializers.CharField(validators=[lambda value:validate_phone_number(value,field_name='office_number')], required=False, allow_blank=True, allow_null=True)
     qualifications = serializers.CharField(validators=[validate_qualifications], required=False, allow_blank=True, allow_null=True)
 
     class Meta:
@@ -237,8 +244,8 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating basic user information.
     """
-    first_name = serializers.CharField(validators=[validate_first_name], required=False, allow_blank=True, allow_null=True)
-    last_name = serializers.CharField(validators=[validate_last_name], required=False, allow_blank=True, allow_null=True)
+    first_name = serializers.CharField(validators=[lambda value:validate_person_name(value,field_name='first_name')], required=False, allow_blank=True, allow_null=True)
+    last_name = serializers.CharField(validators=[lambda value:validate_person_name(value,field_name='last_name')], required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = User

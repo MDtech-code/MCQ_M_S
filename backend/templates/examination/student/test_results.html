@@ -1,4 +1,3 @@
-```html
 {% extends 'base/base.html' %}
 {% load static %}
 
@@ -6,7 +5,13 @@
 
 {% block content %}
 <div class="container py-5">
-  <h1 class="text-center mb-4" data-aos="fade-up">Your Test Results</h1>
+  <h1 class="text-center mb-4" data-aos="fade-up">
+    {% if test %}
+      Test Results for {{ test.title }}
+    {% else %}
+      Your Test Results
+    {% endif %}
+  </h1>
   <div class="row justify-content-center">
     <div class="col-md-10">
       {% if messages %}
@@ -33,20 +38,29 @@
                 {% for attempt in attempts %}
                   <tr>
                     <td>{{ attempt.test.title }}</td>
-                    <td>{{ attempt.score|default:"N/A" }} / {{ attempt.test.questions.count}}</td>
+                    <td>{{ attempt.score|default:"N/A" }} / {{ attempt.test.questions.count }}</td>
                     <td>{{ attempt.end_time|date:"Y-m-d H:i"|default:"Not submitted" }}</td>
                     <td>
-                      <a href="{% url 'test_results' attempt.id %}" class="btn btn-sm btn-primary">View Details</a>
+                      <a href="{% url 'test_results_detail' attempt.id %}" class="btn btn-sm btn-primary">View Details</a>
                     </td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
           {% else %}
-            <p class="text-muted">No test results available.</p>
+            <p class="text-muted">
+              {% if test %}
+                No test results available for {{ test.title }}.
+              {% else %}
+                No test results available.
+              {% endif %}
+            </p>
           {% endif %}
           <div class="text-center mt-4">
             <a href="{% url 'student_dashboard' %}" class="btn btn-outline-primary">Back to Dashboard</a>
+            {% if test %}
+              <a href="{% url 'test_list' %}" class="btn btn-outline-secondary">Back to Test List</a>
+            {% endif %}
           </div>
         </div>
       </div>

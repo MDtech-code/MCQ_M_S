@@ -3,7 +3,16 @@ import spacy
 
 nlp = spacy.load("en_core_web_sm")
 
+
+import re
+
+def preprocess_paragraph(paragraph):
+    paragraph = paragraph.replace("—", " ").replace("–", " ").replace("�", "")
+    paragraph = re.sub(r'[^\w\s.,!?]', ' ', paragraph)  # Keep basic punctuation, remove odd characters
+    return paragraph.strip()
+
 def generate_mcqs(paragraph, max_questions=5):
+    paragraph = preprocess_paragraph(paragraph)
     doc = nlp(paragraph)
     questions = []
     sentences = [sent.text.strip() for sent in doc.sents if len(sent.text.strip().split()) >= 5]

@@ -1,5 +1,8 @@
 from django.template import Library
 
+
+
+
 register = Library()
 
 @register.filter
@@ -36,3 +39,9 @@ def div(value, arg):
 def mul(value, arg):
     """Multiply value by arg."""
     return value * arg if value is not None and arg is not None else 0
+
+
+
+
+
+

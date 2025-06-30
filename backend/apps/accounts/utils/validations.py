@@ -4,7 +4,9 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import EmailValidator
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth import password_validation
+from PIL import Image
+import os
+
 
 from datetime import date, timedelta
 import re
@@ -13,49 +15,108 @@ logger = logging.getLogger(__name__)
 
 # Constants for validation
 GENDER_CHOICES = ['MA', 'FE', 'UD']  # Male, Female, Undisclosed
-ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif']
+# ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif','image/jpg']
 MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5MB
+ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+MIN_DIMENSIONS    = (50, 50)          # width, height in pixels
+MAX_DIMENSIONS    = (2000, 2000)
+
+
+# ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif'}
 VALID_GRADES = [str(i) for i in range(1, 13)] + ['A-Level', 'O-Level', 'Other']
 VALID_DEPARTMENTS = ['Mathematics', 'Science', 'English', 'History', 'Computer Science', 'Other']
-MAX_NAME_LENGTH = 50
+MAX_NAME_LENGTH = 70
 MAX_FIELD_LENGTH = 100
 MIN_USERNAME_LENGTH = 3
 MAX_USERNAME_LENGTH = 150
 
+
+
+def validate_person_name(value: str, field_name: str = "Name") -> str:
+    """
+    Validate a person's name or username, ensuring it meets character and length requirements.
+    Returns unchanged value if empty (for optional fields).
+    Args:
+        value: The string to validate.
+        field_name: The name of the field for error messaging.
+    Raises:
+        ValidationError: If the value contains invalid characters or exceeds length limits.
+    """
+    if not value:
+        return value
+    if len(value) > MAX_NAME_LENGTH:
+        logger.warning("%s too long: %s", field_name, value)
+        raise ValidationError(_('%(field_name)s must be under %(max)s characters') % {'field_name': field_name, 'max': MAX_NAME_LENGTH})
+    
+    if field_name.lower() == "username":
+        if len(value) < MIN_USERNAME_LENGTH:
+            logger.warning("Username too short: %s", value)
+            raise ValidationError(_('Username must be at least %(min)s characters') % {'min': MIN_USERNAME_LENGTH})
+        if len(value) > MAX_USERNAME_LENGTH:
+            logger.warning("Username too long: %s", value)
+            raise ValidationError(_('Username must be under %(max)s characters') % {'max': MAX_USERNAME_LENGTH})
+        if not re.match(r'^(?=.*[A-Za-z0-9])[A-Za-z0-9_.-]+$', value):
+            raise ValidationError(_("Username must contain at least one letter or number and can only include letters, numbers, dots, hyphens, and underscores"))
+        
+    else:
+       if not re.match(r'^[A-Za-z\s-]+$', value):
+        raise ValidationError(_('%(field_name)s can only contain letters, spaces, or hyphens') % {'field_name': field_name})
+       
+    return value
+
+def validate_email(value:str,field_name:str = 'Name')-> str:
+    """
+    Validate that the email is a valid email address using Django's EmailValidator.
+    Allows empty values for optional fields.
+    Args:
+        value: The email string to validate.
+        field_name: The name of the field for error messaging.
+    Raises:
+        ValidationError: If the email is invalid or exceeds length limits.
+    """
+    if not value:
+        return value
+    validator = EmailValidator(message=_('Invalid %(field_name)s address') % {'field_name': field_name})
+    try:
+        validator(value)
+        if len(value) > MAX_FIELD_LENGTH:
+            logger.warning("%s too long: %s",field_name, value)
+            raise ValidationError(_('%(field_name)s must be under %(max)s characters') % {'max': MAX_FIELD_LENGTH,'field_name':field_name})
+    except ValidationError as e:
+        logger.warning("Invalid %s: %s",field_name, value)
+        raise ValidationError(e.message)
+    return value
+
+
 # Contact Info Validators
-def validate_phone_number(value: str) -> str:
+def validate_phone_number(value: str,field_name:str = "Name") -> str:
     """
     Validate and format international phone numbers using the phonenumbers library.
     Returns the phone number in E164 format if valid.
+
+    Args:
+        value: The phone number string to validate.
+        field_name: The name of the field for error messaging.
+
+    Raises:
+        ValidationError: If the phone number is invalid or improperly formatted.
     """
+
     if not value:
         return value
     try:
         parsed = parse(value, None)
         if not is_valid_number(parsed):
-            logger.warning("Invalid phone number: %s", value)
-            raise ValidationError(_('Invalid phone number'))
+            logger.warning("Invalid %s: %s",field_name, value)
+            raise ValidationError(_('Invalid {}').format(field_name))
         return format_number(parsed, PhoneNumberFormat.E164)
     except NumberParseException:
-        logger.warning("Phone number parse error: %s", value)
-        raise ValidationError(_('Invalid phone number format'))
+        logger.warning("%s parse error: %s",field_name, value)
+        raise ValidationError(_('Invalid {} format').format(field_name))
+    
 
-def validate_parent_email(value: str) -> str:
-    """
-    Validate that the parent email is a valid email address using Django's EmailValidator.
-    """
-    if not value:
-        return value
-    validator = EmailValidator(message=_('Invalid parent email address'))
-    try:
-        validator(value)
-        if len(value) > MAX_FIELD_LENGTH:
-            logger.warning("Parent email too long: %s", value)
-            raise ValidationError(_('Parent email must be under %(max)s characters') % {'max': MAX_FIELD_LENGTH})
-    except ValidationError as e:
-        logger.warning("Invalid parent email: %s", value)
-        raise ValidationError(e.message)
-    return value
+
+
 
 # Personal Info Validators
 def validate_date_of_birth(value: date) -> date:
@@ -86,51 +147,7 @@ def validate_gender(value: str) -> str:
         raise ValidationError(_('Gender must be one of: %(choices)s') % {'choices': ', '.join(GENDER_CHOICES)})
     return normalized
 
-def validate_first_name(value: str) -> str:
-    """
-    Validate first name: letters, spaces, hyphens, max length.
-    """
-    if not value:
-        return value
-    if len(value) > MAX_NAME_LENGTH:
-        logger.warning("First name too long: %s", value)
-        raise ValidationError(_('First name must be under %(max)s characters') % {'max': MAX_NAME_LENGTH})
-    if not re.match(r'^[A-Za-z\s-]+$', value):
-        logger.warning("Invalid characters in first name: %s", value)
-        raise ValidationError(_('First name can only contain letters, spaces, or hyphens'))
-    return value
 
-def validate_last_name(value: str) -> str:
-    """
-    Validate last name: letters, spaces, hyphens, max length.
-    """
-    if not value:
-        return value
-    if len(value) > MAX_NAME_LENGTH:
-        logger.warning("Last name too long: %s", value)
-        raise ValidationError(_('Last name must be under %(max)s characters') % {'max': MAX_NAME_LENGTH})
-    if not re.match(r'^[A-Za-z\s-]+$', value):
-        logger.warning("Invalid characters in last name: %s", value)
-        raise ValidationError(_('Last name can only contain letters, spaces, or hyphens'))
-    return value
-
-# Authentication Validators
-def validate_username(value: str) -> str:
-    """
-    Validate username: alphanumeric, length between 3-150, and unique.
-    """
-    if not value:
-        return value
-    if len(value) < MIN_USERNAME_LENGTH:
-        logger.warning("Username too short: %s", value)
-        raise ValidationError(_('Username must be at least %(min)s characters') % {'min': MIN_USERNAME_LENGTH})
-    if len(value) > MAX_USERNAME_LENGTH:
-        logger.warning("Username too long: %s", value)
-        raise ValidationError(_('Username must be under %(max)s characters') % {'max': MAX_USERNAME_LENGTH})
-    if not re.match(r'^[A-Za-z0-9_]+$', value):
-        logger.warning("Invalid characters in username: %s", value)
-        raise ValidationError(_('Username can only contain letters, numbers, and underscores'))
-    return value
 
 
 def validate_password_strength(value: str, user=None) -> str:
@@ -171,20 +188,6 @@ def validate_password_strength(value: str, user=None) -> str:
 
     return value
 
-# File Upload Validators
-def validate_avatar(value) -> str:
-    """
-    Validate that the uploaded avatar is a valid image and within size limits.
-    """
-    if not value:
-        return value
-    if value.content_type not in ALLOWED_IMAGE_TYPES:
-        logger.warning("Invalid avatar content type: %s", value.content_type)
-        raise ValidationError(_('Avatar must be a JPEG, PNG, or GIF image'))
-    if value.size > MAX_AVATAR_SIZE:
-        logger.warning("Avatar file too large: %s bytes", value.size)
-        raise ValidationError(_('Avatar file size must be under %(max)s MB') % {'max': MAX_AVATAR_SIZE // (1024 * 1024)})
-    return value
 
 # Role-Specific Validators
 def validate_grade_level(value: str) -> str:
@@ -209,19 +212,6 @@ def validate_department(value: str) -> str:
         raise ValidationError(_('Department must be one of: %(choices)s') % {'choices': ', '.join(VALID_DEPARTMENTS)})
     return value
 
-def validate_office_number(value: str) -> str:
-    """
-    Validate office number: alphanumeric, max length.
-    """
-    if not value:
-        return value
-    # if len(value) > MAX_FIELD_LENGTH:
-    #     logger.warning("Office number too long: %s", value)
-    #     raise ValidationError(_('Office number must be under %(max)s characters') % {'max': MAX_FIELD_LENGTH})
-    # if not re.match(r'^[A-Za-z0-9\s-]+$', value):
-    #     logger.warning("Invalid characters in office number: %s", value)
-    #     raise ValidationError(_('Office number can only contain alphanumeric characters, spaces, or hyphens'))
-    return value
 
 def validate_qualifications(value: str) -> str:
     """
@@ -233,3 +223,70 @@ def validate_qualifications(value: str) -> str:
         logger.warning("Qualifications too long: %s", value)
         raise ValidationError(_('Qualifications must be under %(max)s characters') % {'max': MAX_FIELD_LENGTH})
     return value
+
+
+
+
+
+
+
+
+
+def validate_avatar(file):
+    """
+    Raise ValidationError if `file` is not a valid avatar image.
+    """
+
+    # -- 1) Extension check --
+    ext = os.path.splitext(file.name)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        allowed = ', '.join(sorted(ALLOWED_EXTENSIONS))
+        raise ValidationError(
+            _('Unsupported file extension. Allowed: %(exts)s'),
+            params={'exts': allowed}
+        )
+
+    # -- 2) File size check --
+    if file.size > MAX_AVATAR_SIZE:
+        max_mb = MAX_AVATAR_SIZE // (1024 * 1024)
+        raise ValidationError(
+            _('Avatar file size must be under %(max)d MB'),
+            params={'max': max_mb}
+        )
+
+    # -- 3) Verify it’s a real image --
+    try:
+        # Pillow’s verify() will throw if the file is invalid or corrupted
+        file.seek(0)
+        img = Image.open(file)
+        img.verify()
+    except Exception:
+        raise ValidationError(_('Uploaded file is not a valid image.'))
+    finally:
+        file.seek(0)
+
+    # -- 4) (Optional) Dimension checks --
+    try:
+        file.seek(0)
+        img = Image.open(file)
+        width, height = img.size
+    except Exception:
+        raise ValidationError(_('Cannot read image dimensions.'))
+
+    if (width < MIN_DIMENSIONS[0] or height < MIN_DIMENSIONS[1]):
+        min_w, min_h = MIN_DIMENSIONS
+        raise ValidationError(
+            _('Image is too small; minimum size is %(w)dx%(h)d pixels.'),
+            params={'w': min_w, 'h': min_h}
+        )
+
+    if (width > MAX_DIMENSIONS[0] or height > MAX_DIMENSIONS[1]):
+        max_w, max_h = MAX_DIMENSIONS
+        raise ValidationError(
+            _('Image is too large; maximum size is %(w)dx%(h)d pixels.'),
+            params={'w': max_w, 'h': max_h}
+        )
+
+    # all good—rewind file and return
+    file.seek(0)
+    return file

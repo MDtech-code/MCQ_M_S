@@ -58,7 +58,7 @@ class MCQGenerationView(APIView):
         return Response({"message": "MCQ generation endpoint (GET)"}, status=status.HTTP_200_OK)
 
     def post(self, request):
-        print(request.data)
+        logger.debug(f"request.body:{request.data}")
         if not request.user.is_active or not request.user.is_verified:
             if request.accepted_renderer.format == 'html':
                 messages.error(request, "Your account is not active or verified.")
@@ -88,8 +88,10 @@ class MCQGenerationView(APIView):
                 )
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        
         paragraph = request.data.get("paragraph")
         topic_ids = request.data.getlist("topics")
+        logger.debug(f"topic_ids: {topic_ids}")
         difficulty = request.data.get("difficulty")
         subject_id = request.data.get("subject")
 
@@ -97,6 +99,7 @@ class MCQGenerationView(APIView):
         try:
             subject = get_object_or_404(Subject, id=subject_id)
             topics = Topic.objects.filter(id__in=topic_ids)
+            logger.debug(f"topics: {list(topics)}")
             if not topics.exists():
                 raise ValueError("No valid topics selected")
             if difficulty not in ['E', 'M', 'H']:

@@ -6,13 +6,7 @@ from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
 
 
-# @login_required
-# def dashboard_redirect(request):
-#     if request.user.role == 'TEACHER':
-#         return redirect('teacher_dashboard')
-#     elif request.user.role == 'STUDENT':
-#         return redirect('student_dashboard')
-#     return redirect('admin:index')
+
 
 
 urlpatterns = [

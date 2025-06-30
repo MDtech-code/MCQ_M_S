@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from apps.content.models import Subject, Topic
 
 def process_question_form_data(data):
+    print('[[[[[]]]]]data]]]]]]]]]]]',data)
     """Process form data for question creation/update."""
     processed_data = data.dict() if hasattr(data, 'dict') else data.copy()
     

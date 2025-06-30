@@ -57,7 +57,7 @@ def handle_user_creation(sender, instance, created, **kwargs):
                     StudentProfile.objects.get_or_create(user=instance)
                 elif instance.role == User.Role.TEACHER:
                     TeacherProfile.objects.get_or_create(user=instance)
-                    
+                instance._assign_role_group()
                 token = EmailVerificationToken.objects.create(user=instance)
                 send_verification_email_task.delay(instance.id, token.token)
                 logger.info(f"Triggered verification email for {instance.email}")

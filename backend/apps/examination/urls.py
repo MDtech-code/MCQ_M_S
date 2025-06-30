@@ -11,6 +11,7 @@ urlpatterns = [
     path('attempts/', TestAttemptView.as_view(), name='attempt_list'),
     path('attempts/<int:pk>/', TestAttemptView.as_view(), name='attempt_detail'),
     path('responses/', StudentResponseView.as_view(), name='response_create'),
-    path('results/', TestResultsView.as_view(), name='test_results'),
-    path('results/<int:pk>/', TestResultsView.as_view(), name='test_results'),
+
+    path('results/test/<int:test_id>/', TestResultsView.as_view(), name='test_results'),
+    path('results/test/detail/<int:pk>/', TestResultsView.as_view(), name='test_results_detail'),
 ]
