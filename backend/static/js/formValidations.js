@@ -18,6 +18,16 @@ const FormValidation = {
 
     // Validation rules for each field
     validators: {
+        first_name: (value) => {
+            if (!value) return "First name is required.";
+            if (value.length > 50) return "First name must be 50 characters or less.";
+            return "";
+        },
+        last_name: (value) => {
+            if (!value) return "Last name is required.";
+            if (value.length > 50) return "Last name must be 50 characters or less.";
+            return "";
+        },
         username: (value) => {
             if (!value) return "Username is required.";
             if (!FormValidation.regex.username.test(value)) {
@@ -251,6 +261,7 @@ avatar: async (value, field) => {
 
     // Display error message with Bootstrap styling
     showError: (field, message) => {
+        if (field.type === "hidden") return;
         const formGroup = field.closest('.form-group, .mb-3');
         if (!formGroup) {
             console.warn(`No .form-group or .mb-3 found for field: ${field.name}`);
@@ -284,7 +295,7 @@ avatar: async (value, field) => {
     },
 
     // Validate a single field
-    validateField: (field) => {
+    validateField: async (field) => {
         const name = field.name;
         const value = field.value.trim();
         let error = "";
@@ -315,7 +326,7 @@ avatar: async (value, field) => {
         } else if (name === "token") {
             error = FormValidation.validators.token(value);
         }else if (name === "avatar") {
-            error = FormValidation.validators.avatar(value, field);
+            error = await FormValidation.validators.avatar(value, field);
         } else if (name === "grade_level") {
             error = FormValidation.validators.grade_level(value, field);
         } else if (name === "department") {
@@ -338,6 +349,11 @@ avatar: async (value, field) => {
             error = FormValidation.validators.correct_answer(value);
         } else if (name === "metadata") {
             error = FormValidation.validators.metadata(value);
+        }else if (name === "first_name"){
+            error=FormValidation.validators.first_name(value);
+        }
+        else if (name === "last_name"){
+            error=FormValidation.validators.last_name(value);
         }else {
             console.warn(`No validator found for field: ${name}`);
         }
@@ -346,20 +362,18 @@ avatar: async (value, field) => {
         return !error;
     },
 
-    // Validate entire form
-    validateForm: (form) => {
+    
+    validateForm: async (form) => {
         FormValidation.clearErrors(form);
-        let isValid = true;
-
-        form.querySelectorAll('input, select').forEach((field) => {
-            if (!FormValidation.validateField(field)) {
-                isValid = false;
-            }
-        });
-
-        return isValid;
-    },
-
+        const fields = form.querySelectorAll('input, select');
+        const validations = Array.from(fields)
+          .filter(field => field.type !== "hidden")
+          .map(field => FormValidation.validateField(field));
+      
+        const results = await Promise.all(validations);
+        return results.every(result => result);
+      },
+    
     // Initialize validation for a form
     init: (formSelector) => {
         const form = document.querySelector(formSelector);

@@ -41,7 +41,7 @@
                 <!-- Edit Mode -->
                 <form method="post" action="{% url 'profile_update' %}" enctype="multipart/form-data" id="profile-update-form" class="needs-validation" novalidate>
                     {% csrf_token %}
-                    <div class="text-center mb-4">
+                    <div class="text-center mb-3">
                         <div class="avatar-upload position-relative d-inline-block">
                             <img src="{% if profile.avatar %}{{ profile.avatar.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" 
                                  class="rounded-circle shadow" 
