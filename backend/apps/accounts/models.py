@@ -143,21 +143,25 @@ class User(AbstractUser):
         group, _ = Group.objects.get_or_create(name=group_name)
         self.groups.add(group)
 
+    # def get_profile(self):
+    #     """
+    #     Explicitly fetch the related profile based on the user's role.
+    #     """
+    #     if self.role == self.Role.STUDENT:
+    #         try:
+    #             return self.studentprofile
+    #         except StudentProfile.DoesNotExist:
+    #             return None
+    #     elif self.role == self.Role.TEACHER:
+    #         try:
+    #             return self.teacherprofile
+    #         except TeacherProfile.DoesNotExist:
+    #             return None
+    #     return None
     def get_profile(self):
-        """
-        Explicitly fetch the related profile based on the user's role.
-        """
-        if self.role == self.Role.STUDENT:
-            try:
-                return self.studentprofile
-            except StudentProfile.DoesNotExist:
-                return None
-        elif self.role == self.Role.TEACHER:
-            try:
-                return self.teacherprofile
-            except TeacherProfile.DoesNotExist:
-                return None
-        return None
+        from apps.accounts.service.profile_service import ProfileService
+        profile = ProfileService.get_profile(self)
+        return profile
     
 
     def __str__(self) -> str:
