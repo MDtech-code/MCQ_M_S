@@ -7,8 +7,9 @@ import os
 DEBUG = True
 print("SUCCESS: config.settings.development.py is NOW being loaded!") 
 # Debug toolbar
-INSTALLED_APPS += ['debug_toolbar']
-MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
+if 'test' not in sys.argv:
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 # Dynamically determine INTERNAL_IPS for Docker and local environments
 def get_internal_ips():

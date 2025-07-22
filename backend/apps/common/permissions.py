@@ -1,7 +1,10 @@
 from rest_framework.permissions import BasePermission
-import logging
+# Add this to top of permissions.py
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
-from django.contrib.auth.models import User
+
+import logging
 logger = logging.getLogger(__name__)
 
 class IsTeacher(BasePermission):
@@ -118,70 +121,164 @@ class IsNotAuthenticated(BasePermission):
 
 
 
-
-
-
-
-
-
 class RoleBasedProfilePermission(BasePermission):
     """
-    Allows access based on user role (group membership):
-    - Students: Must be in Student_Group and verified.
-    - Teachers: Must be in Teacher_Group, verified, and approved.
-    - Admins: Must be in Admin_Group and verified.
+    Composite permission that requires:
+    1. User verification (using IsVerified permission logic)
+    2. Role-specific access rules:
+        - Students: Must be in Student_Group
+        - Teachers: Must be in Teacher_Group and approved
+        - Admins: Must be in Admin_Group
+    
+    Logs detailed access attempts and denials for auditing.
     """
     message = "You do not have permission to perform this action."
 
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            logger.warning("Unauthenticated access attempt to profile update")
+        user = request.user
+        
+        # Reuse IsVerified permission logic
+        if not user.is_authenticated:
+            logger.warning("Unauthenticated access attempt to role-based action")
             return False
-
-        # Check if user is verified
-        is_verified = getattr(request.user, 'is_verified', False)
+            
+        # Leverage IsVerified's verification check with logging
+        is_verified = getattr(user, 'is_verified', False)
+        print(is_verified)
         if not is_verified:
             logger.warning(
-                "User %s denied access: is_verified=%s",
-                getattr(request.user, 'username', 'anonymous'),
+                "User %s denied role access: verification_status=%s",
+                getattr(user, 'username', 'anonymous'),
                 is_verified
             )
             return False
+            
+        # Cache groups to minimize database queries
+        if not hasattr(user, '_cached_groups'):
+            user._cached_groups = set(user.groups.values_list('name', flat=True))
+        
+        # Check role-specific permissions
+        is_student = 'Student_Group' in user._cached_groups
+        is_teacher = 'Teacher_Group' in user._cached_groups
+        is_admin = 'Admin_Group' in user._cached_groups
 
-        # Check group membership
-        is_student = request.user.groups.filter(name='Student_Group').exists()
-        is_teacher = request.user.groups.filter(name='Teacher_Group').exists()
-        is_admin = request.user.groups.filter(name='Admin_Group').exists()
-
-        # Student: Must be in Student_Group
+        # Student access (only requires group membership)
         if is_student:
-            logger.debug("User %s granted student access", getattr(request.user, 'username', 'anonymous'))
+            logger.info("User %s granted student access", user.username)
             return True
 
-        # Teacher: Must be in Teacher_Group and approved
+        # Teacher access (requires approval)
         if is_teacher:
-            is_approved = getattr(request.user, 'is_approved', False)
-            if is_approved:
-                logger.debug("User %s granted approved teacher access", getattr(request.user, 'username', 'anonymous'))
+            if user.is_approved:
+                logger.info("User %s granted approved teacher access", user.username)
                 return True
             logger.warning(
-                "User %s denied teacher access: is_approved=%s",
-                getattr(request.user, 'username', 'anonymous'),
-                is_approved
+                "User %s denied teacher access: approval_status=%s",
+                user.username,
+                user.is_approved
             )
             return False
 
-        # Admin: Must be in Admin_Group
+        # Admin access
         if is_admin:
-            logger.debug("User %s granted admin access", getattr(request.user, 'username', 'anonymous'))
+            logger.info("User %s granted admin access", user.username)
             return True
 
-        # No valid role
+        # No valid role found
         logger.warning(
-            "User %s denied access: is_student=%s, is_teacher=%s, is_admin=%s",
-            getattr(request.user, 'username', 'anonymous'),
+            "User %s denied access: valid_roles=%s (student:%s, teacher:%s, admin:%s)",
+            user.username,
+            list(user._cached_groups),
             is_student,
             is_teacher,
             is_admin
         )
         return False
+
+
+
+
+
+# class RoleBasedProfilePermission(BasePermission):
+#     """
+#     Allows access based on user role (group membership):
+#     - Students: Must be in Student_Group and verified.
+#     - Teachers: Must be in Teacher_Group, verified, and approved.
+#     - Admins: Must be in Admin_Group and verified.
+#     """
+#     message = "You do not have permission to perform this action."
+
+#     def has_permission(self, request, view):
+#         # Cache user instance to prevent multiple DB hits
+#         user = request.user
+        
+#         if not user.is_authenticated:
+#             return False
+            
+#         # Check verification status
+#         if not user.is_verified:
+#             return print(' mia chutia hu mujia verifed ni mila  ')
+            
+            
+#         # Cache group check results
+#         if not hasattr(user, '_cached_groups'):
+#             user._cached_groups = set(user.groups.values_list('name', flat=True))
+        
+#         # Check group membership
+#         return any([
+#             'Student_Group' in user._cached_groups,
+#             'Teacher_Group' in user._cached_groups and user.is_approved,
+#             'Admin_Group' in user._cached_groups
+#         ])
+    # def has_permission(self, request, view):
+    #     if not request.user or not request.user.is_authenticated:
+    #         logger.warning("Unauthenticated access attempt to profile update")
+    #         return False
+
+    #     # Check if user is verified
+    #     is_verified = getattr(request.user, 'is_verified', False)
+    #     if not is_verified:
+    #         logger.warning(
+    #             "User %s denied access: is_verified=%s",
+    #             getattr(request.user, 'username', 'anonymous'),
+    #             is_verified
+    #         )
+    #         return False
+
+    #     # Check group membership
+    #     is_student = request.user.groups.filter(name='Student_Group').exists()
+    #     is_teacher = request.user.groups.filter(name='Teacher_Group').exists()
+    #     is_admin = request.user.groups.filter(name='Admin_Group').exists()
+
+    #     # Student: Must be in Student_Group
+    #     if is_student:
+    #         logger.debug("User %s granted student access", getattr(request.user, 'username', 'anonymous'))
+    #         return True
+
+    #     # Teacher: Must be in Teacher_Group and approved
+    #     if is_teacher:
+    #         is_approved = getattr(request.user, 'is_approved', False)
+    #         if is_approved:
+    #             logger.debug("User %s granted approved teacher access", getattr(request.user, 'username', 'anonymous'))
+    #             return True
+    #         logger.warning(
+    #             "User %s denied teacher access: is_approved=%s",
+    #             getattr(request.user, 'username', 'anonymous'),
+    #             is_approved
+    #         )
+    #         return False
+
+    #     # Admin: Must be in Admin_Group
+    #     if is_admin:
+    #         logger.debug("User %s granted admin access", getattr(request.user, 'username', 'anonymous'))
+    #         return True
+
+    #     # No valid role
+    #     logger.warning(
+    #         "User %s denied access: is_student=%s, is_teacher=%s, is_admin=%s",
+    #         getattr(request.user, 'username', 'anonymous'),
+    #         is_student,
+    #         is_teacher,
+    #         is_admin
+    #     )
+    #     return False

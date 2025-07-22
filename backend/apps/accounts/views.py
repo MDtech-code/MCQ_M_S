@@ -20,6 +20,7 @@ from django.contrib import messages
 from apps.common.permissions import IsTeacher,IsStudent,IsApprovedTeacher,IsAdmin,IsVerified,IsNotAuthenticated,RoleBasedProfilePermission
 from apps.accounts.service.auth_service import AuthService
 from apps.accounts.service.profile_service import ProfileService
+from apps.common.api.base import BaseAPIView
 import logging
 logger = logging.getLogger(__name__)
 
@@ -27,19 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 
-#! Base api view to handle both json and html renderer
-class BaseAPIView(APIView):
-    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
-    def render_response(self, data, status_code, template_name=None, message=None, message_level='success'):
-        if self.request.accepted_renderer.format == 'html':
-            if message:
-                getattr(messages, message_level)(self.request, message)
-                 # Handle redirects for HTML responses
-            if template_name and template_name.startswith('redirect:'):
-                return redirect(template_name.replace('redirect:', ''))
-            return Response(data, template_name=template_name, status=status_code)
-        return Response(data, status=status_code)
+
+
+
+
 
 
 
@@ -47,26 +40,21 @@ class BaseAPIView(APIView):
 
 
 #! Signup 
-
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class SignupView(BaseAPIView):
+    template_name='accounts/auth/signup.html'
     permission_classes = [IsNotAuthenticated]
     authentication_classes = [SessionAuthentication]
 
+
     def get(self, request):
-        return self.render_response({"message": "Signup endpoint (GET)"}, status.HTTP_200_OK, 'accounts/auth/signup.html')
+        return self.render_response(data={"message": "Signup endpoint (GET)"}, status_code=status.HTTP_200_OK, template_name=self.template_name)
 
     def post(self, request):
         auth_service = AuthService()
         user, token, errors = auth_service.signup(request)
         if errors:
-            return self.render_response(
-                {"errors": errors, "form_data": request.data},
-                status.HTTP_400_BAD_REQUEST,
-                'accounts/auth/signup.html',
-                "Signup failed. Please check your input.",
-                'error'
-            )
+            return self.render_response(data={"errors": errors},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message="Signup failed. Please check your input.",message_level= 'error',html_context={"form_data": request.data})
         response_data = {
             "user": {
                 "id": user.id,
@@ -74,9 +62,8 @@ class SignupView(BaseAPIView):
                 "email": user.email,
                 "role": user.role
             },
-            "message": "User created successfully"
         }
-        response = self.render_response(response_data, status.HTTP_201_CREATED, 'redirect:home', "User created successfully.")
+        response = self.render_response(data=response_data, status_code=status.HTTP_201_CREATED, template_name='redirect:home', message="User created successfully.")
         response.set_cookie(
             key='auth_token',
             value=token,
@@ -85,35 +72,38 @@ class SignupView(BaseAPIView):
             max_age=86400
         )
         return response
+    
+
 
 #! login
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class LoginView(BaseAPIView):
+    template_name='accounts/auth/login.html'
     permission_classes = [IsNotAuthenticated]
     authentication_classes = [SessionAuthentication]
 
     def get(self, request):
-        return self.render_response({"message": "Login endpoint (GET)"}, status.HTTP_200_OK, 'accounts/auth/login.html')
+        return self.render_response(data={"message": "Login endpoint (GET)"}, status_code=status.HTTP_200_OK, template_name=self.template_name)
 
     def post(self, request):
         auth_service = AuthService()
         user, token, errors = auth_service.login(request)
         if errors:
             return self.render_response(
-                {"errors": errors, "form_data": request.data},
-                status.HTTP_401_UNAUTHORIZED,
-                'accounts/auth/login.html',
-                "Invalid credentials. Please try again.",
-                'error'
+                data={"errors": errors},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                template_name=self.template_name,
+                message="Invalid credentials. Please try again.",
+                message_level='error',
+                html_context={"form_data": request.data}
             )
         response_data = {
-            "message": "Login successful",
             "user_id": user.id,
             "email": user.email,
             "role": user.role
         }
         cookie_max_age = 30 * 24 * 3600 if request.data.get('remember') else None
-        response = self.render_response(response_data, status.HTTP_200_OK, 'home', "User login successfully.")
+        response = self.render_response(data=response_data, status_code=status.HTTP_200_OK, template_name='redirect:home', message="User login successfully.")
         response.set_cookie(
             key='auth_token',
             value=token,
@@ -124,214 +114,78 @@ class LoginView(BaseAPIView):
         return response
 
 
-'''
+
+#! logout view
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class SignupView(APIView):
-    """
-    API endpoint for user registration.
-    """
-    renderer_classes = [JSONRenderer,TemplateHTMLRenderer]
-    permission_classes = [IsNotAuthenticated]
-    authentication_classes=[SessionAuthentication]
-
-    def get(self,request):
-        if request.accepted_renderer.format == 'html':
-            return Response(template_name='accounts/auth/signup.html')
-        return Response({"message": "Signup endpoint (GET)"}, status=200)
-
-    
-    def post(self, request):
-        logger.info("Signup request received with data: %s", request.data)
-        serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            logger.info("User created successfully: %s (ID: %s)", user.username, user.id)
-            user_signed_up.send(sender=self.__class__, user=user)
-
-            token, _ = Token.objects.get_or_create(user=user)
-            response_data={
-                 "user": {
-                     "id": user.id,
-                     "username": user.username,
-                     "email": user.email,
-                     'role':user.role
-                 },
-                 "message": "User created successfully"
-             }
-             
-            if request.accepted_renderer.format == 'html':
-                login(request, user, backend='apps.accounts.backends.EmailOrUsernameBackend')
-                
-                messages.success(request, "User created successfully.")
-                response =redirect('home')
-            else:
-                response =Response(response_data,status=status.HTTP_201_CREATED)        
-            response.set_cookie(
-                key='auth_token',
-                value=token.key,
-                httponly=True,
-                samesite='Lax',
-                max_age=86400
-            )
-            return response
-            
-        else:
-            logger.warning("Signup validation errors: %s", serializer.errors)
-            if request.accepted_renderer.format == 'html':
-                return Response(
-                    {"errors": serializer.errors, "form_data": request.data},
-                    template_name='accounts/auth/signup.html',
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-        
-@method_decorator(ensure_csrf_cookie, name='dispatch')
-class LoginView(APIView):
-    """
-    API endpoint for user login.
-    """
-    authentication_classes=[SessionAuthentication]
-    permission_classes=[IsNotAuthenticated]
-    renderer_classes = [JSONRenderer,TemplateHTMLRenderer]
-
-    def get(self,request):
-        if request.accepted_renderer.format == 'html':
-            return Response(template_name='accounts/auth/login.html')
-        return Response({"message": "Login endpoint (GET)"}, status=200)
-
-    def post(self, request):
-        logger.info("Login attempt for username: %s", request.data.get('username'))
-        serializer = UserLoginSerializer(data=request.data)
-        if serializer.is_valid():
-            username = serializer.validated_data['username']
-            password = serializer.validated_data['password']
-            user = authenticate(request, username=username, password=password)
-            if user is not None:
-                token, _ = Token.objects.get_or_create(user=user)
-                logger.info("User '%s' logged in successfully.", username)
-                response_data = {
-                    "message": "Login successful",
-                    "user_id": user.pk,
-                    "email": user.email,
-                    "role": user.role
-                }
-                if request.accepted_renderer.format == 'html':
-                    login(request, user,backend='apps.accounts.backends.EmailOrUsernameBackend')
-                    messages.success(request, "User login successfully.")
-                    response=redirect('home')
-                else:
-                    response = Response(
-                        response_data,
-                        status=status.HTTP_200_OK
-                    )
-                if request.data.get('remember'):
-                    cookie_max_age=30 * 24 * 3600
-                else:
-                    cookie_max_age=None
-                # Set cookie for all response types
-                response.set_cookie(
-                    key='auth_token',
-                    value=token.key,
-                    httponly=True,
-                    samesite='Lax',
-                    max_age=cookie_max_age
-                )
-                return response
-            else:
-                logger.warning("Invalid credentials for username: %s", username)
-                error_response = {"errors": {"non_field_errors": ["Invalid credentials"]}}
-                if request.accepted_renderer.format == 'html':
-                   return Response(
-                    {"errors": error_response["errors"], "form_data": request.data},
-                    template_name="accounts/auth/login.html",
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-                return Response(error_response,status=status.HTTP_401_UNAUTHORIZED)
-        else:
-            logger.warning("Login serializer errors: %s", serializer.errors)
-            if request.accepted_renderer.format == 'html':
-                return Response(
-                {"errors": serializer.errors, "form_data": request.data},
-                template_name="accounts/auth/login.html",
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            return Response(
-                    {"errors": serializer.errors},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-'''
-
-@method_decorator(ensure_csrf_cookie, name='dispatch')
-class LogoutView(APIView):
-    """
-    API endpoint for user logout (Token Authentication).
-    Deletes the user's authentication token from the server.
-    """
+class LogoutView(BaseAPIView):
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
-    renderer_classes = [JSONRenderer,TemplateHTMLRenderer]
 
     def post(self, request, *args, **kwargs):
-        
         username = request.user.username
         logger.info("Logout initiated for user '%s'", username)
+        
         try:
+            # Token deletion (for API clients)
             if request.auth:
                 request.auth.delete()
                 logger.info("Token for user '%s' deleted successfully.", username)
             else:
-                 logger.warning("No token found for authenticated user '%s' during logout.", username)
+                logger.warning("No token found for authenticated user '%s' during logout.", username)
 
+            # Session termination (for all clients)
+            logout(request)
             
-            if request.accepted_renderer.format == "html":
-                logout(request)
-                response=redirect('home')
-            else:
-                response=Response({'message':'logout successfully'},status=status.HTTP_200_OK)
-                
+            # Create response using base view - it handles both HTML/JSON automatically
+            response = self.render_response(
+                data={},
+                status_code=status.HTTP_200_OK,
+                template_name='redirect:home',  # Redirect HTML clients
+                message="You have been logged out successfully.",
+            )
+            
+            # Delete authentication cookies
             response.delete_cookie('auth_token')
-            response.delete_cookie('csrftoken')
+            
+           
             return response
+            
         except Exception as e:
             logger.error("Error during logout for user '%s': %s", username, str(e))
-            if request.accepted_renderer.format == "html":
-                return Response(
-                    {"error": "An error occurred during logout."},
-                    template_name="home/home.html",
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            return Response({"error": "An error occurred during logout."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-
+            return self.render_response(
+                data={},
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                template_name='home/home.html',
+                message="An error occurred during logout.",
+                message_level='error',
+            )
 
 
 
 
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class VerifyEmailView(APIView):
+class VerifyEmailView(BaseAPIView):
+    template_name='accounts/verify_email.html'
     permission_classes = [AllowAny]
-    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
     def get(self, request, token):
-    
-        print(f"Auth Header: {request.headers.get('Authorization')}")
-        print(f"Cookies: {request.COOKIES}")
-        print(f"User Authenticated? {request.user.is_authenticated}")
         try:
-            
             token_obj = EmailVerificationToken.objects.get(token=token)
             user = token_obj.user
 
-            # validate token expiry
+            # Validate token expiry
             if not token_obj.is_valid():
                 logger.warning(f"Expired token {token} for {token_obj.user.email}")
-                if request.accepted_renderer.format == 'html':
-                    messages.error(request, "Verification link has expired.")
-                    return Response({},template_name='accounts/verify_email.html', status=status.HTTP_400_BAD_REQUEST)
-                return Response({"error": "Token has expired"}, status=status.HTTP_400_BAD_REQUEST)
-            originally_verified=user.is_verified
+                return self.render_response(
+                    data={},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    template_name=self.template_name,
+                    message="Verification link has expired.",
+                    message_level='error'
+                )
+            
+            originally_verified = user.is_verified
             if token_obj.new_email:
                 user.email = token_obj.new_email
                 user.is_verified = True
@@ -344,64 +198,66 @@ class VerifyEmailView(APIView):
             token_obj.delete()
             login(request, user, backend='apps.accounts.backends.EmailOrUsernameBackend')
 
-
-            if originally_verified and  not token_obj.new_email:
-                print('mia triger ho gai')
+            if originally_verified and not token_obj.new_email:
                 logger.info(f"Email already verified for {user.email}")
-                if request.accepted_renderer.format == 'html':
-                    messages.info(request, "Email already verified.")
-                    
-                    return redirect('profile')
-                return Response({"message": "Email already verified"}, status=status.HTTP_200_OK)
-            if request.accepted_renderer.format == 'html':
-                print('mia bi ho gia')
-                messages.success(request, "Email verified successfully.")
-                
-                return Response({},template_name='accounts/verify_email.html')
-            return Response({"message": "Email verified successfully"}, status=status.HTTP_200_OK)
+                return self.render_response(
+                    data={},
+                    status_code=status.HTTP_200_OK,
+                    template_name='redirect:profile',
+                    message="Email already verified.",
+                    message_level='info'
+                )
+            
+            # Successful verification
+            return self.render_response(
+                data={},
+                status_code=status.HTTP_200_OK,
+                template_name=self.template_name, 
+                message="Email verified successfully.",
+                message_level='success'
+            )
+            
         except EmailVerificationToken.DoesNotExist:
             logger.warning(f"Invalid token {token}")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, "Invalid verification link.")
-                return Response({},template_name='accounts/verify_email.html', status=status.HTTP_400_BAD_REQUEST)
-            return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
+            return self.render_response(
+                data={},
+                status_code=status.HTTP_400_BAD_REQUEST,
+                template_name=self.template_name,
+                message="Invalid verification link.",
+                message_level='error'
+            )
 
 
 
-    
+
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class ResendVerificationEmailView(APIView):
+class ResendVerificationEmailView(BaseAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
+
 
     def post(self, request):
         user = request.user
         if user.is_verified:
             logger.info(f"User {user.email} already verified, resend rejected")
-            if request.accepted_renderer.format == 'html':
-                messages.info(request, "Your email is already verified.")
-                return redirect('home')
-            return Response({"message": "Email already verified"}, status=status.HTTP_400_BAD_REQUEST)
+            return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name='redirect:home',message="Email already verified",message_level='info')
+        
         EmailVerificationToken.objects.filter(user=user).delete()
         token = EmailVerificationToken.objects.create(user=user)
         send_verification_email_task.delay(user.id, token.token)
         logger.info(f"Resent verification email for {user.email}")
-        if request.accepted_renderer.format == 'html':
-            messages.success(request, "Verification email sent.")
-            return redirect('home')
-        return Response({"message": "Verification email sent"}, status=status.HTTP_200_OK)
+        return self.render_response(data={},status_code=status.HTTP_200_OK,template_name='redirect:home',message="Verification email sent")
+    
+
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class ForgotPasswordView(APIView):
+class ForgotPasswordView(BaseAPIView):
+    template_name='accounts/password_reset_request.html'
     permission_classes = [IsNotAuthenticated]
     authentication_classes = [SessionAuthentication]
-    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
     def get(self, request):
-        if request.accepted_renderer.format == 'html':
-            return Response(template_name='accounts/password_reset_request.html')
-        return Response({"message": "Forgot password endpoint (GET)"}, status=200)
+        return self.render_response(data={"message": "Forgot password endpoint (GET)"},status_code=status.HTTP_200_OK,template_name=self.template_name)
 
     def post(self, request):
         print(request.data)
@@ -416,48 +272,31 @@ class ForgotPasswordView(APIView):
                 logger.info(f"Password reset email triggered for {email}")
             except User.DoesNotExist:
                 pass  # Silent
-            if request.accepted_renderer.format == 'html':
-                messages.success(request, "Password reset email sent. Check your inbox.")
-                return Response(template_name='accounts/password_reset_done.html')
-            return Response({"message": "Password reset email sent"}, status=status.HTTP_200_OK)
+            return self.render_response(data={},status_code=status.HTTP_200_OK,template_name='accounts/password_reset_done.html',message="Password reset email sent. Check your inbox.")
         logger.warning(f"Forgot password failed: %s", serializer.errors)
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {"errors": serializer.errors, "form_data": request.data},
-                template_name='accounts/password_reset_request.html',
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message='Error accour during password reset .',errors=serializer.errors,message_level='error',html_context={"form_data": request.data})
     
 
 
 
-
-
+#! Password reset view
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class ResetPasswordView(APIView):
+class ResetPasswordView(BaseAPIView):
+    template_name='accounts/password_reset_confirm.html'
     permission_classes = [IsNotAuthenticated]
     authentication_classes = [SessionAuthentication]
-    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
+
 
     def get(self, request, token):
         try:
             token_obj = PasswordResetToken.objects.get(token=token)
             if not token_obj.is_valid():
                 logger.warning(f"Expired reset token {token}")
-                if request.accepted_renderer.format == 'html':
-                    messages.error(request, "Password reset link has expired.")
-                    return Response(template_name='accounts/password_reset_confirm.html', status=status.HTTP_400_BAD_REQUEST)
-                return Response({"error": "Token has expired"}, status=status.HTTP_400_BAD_REQUEST)
-            if request.accepted_renderer.format == 'html':
-                return Response({'token': token}, template_name='accounts/password_reset_confirm.html')
-            return Response({"message": "Valid token"}, status=status.HTTP_200_OK)
+                return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message="Password reset link has expired.",message_level='error')
+            return self.render_response(data={"message": "Valid token"},status_code=status.HTTP_200_OK,template_name=self.template_name,html_context={'token': token})
         except PasswordResetToken.DoesNotExist:
             logger.warning(f"Invalid reset token {token}")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, "Invalid password reset link.")
-                return Response(template_name='accounts/password_reset_confirm.html', status=status.HTTP_400_BAD_REQUEST)
-            return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
+            return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message="Invalid password reset link.",message_level='error')
 
     def post(self, request, token):
         data = {
@@ -478,41 +317,31 @@ class ResetPasswordView(APIView):
                 if request.auth:
                     request.auth.delete()
                     logger.info(f"Auth token deleted for user {user.email}")
-                if request.accepted_renderer.format == 'html':
-                    messages.success(request, "Password reset successfully.")
-                    return Response(template_name='accounts/password_reset_complete.html')
-                return Response({"message": "Password reset successfully"}, status=status.HTTP_200_OK)
+                return self.render_response(data={},status_code=status.HTTP_200_OK,template_name='accounts/password_reset_complete.html',message="Password reset successfully.")
+              
             except PasswordResetToken.DoesNotExist:
                 logger.warning(f"Invalid reset token {token}")
-                if request.accepted_renderer.format == 'html':
-                    messages.error(request, "Invalid password reset link.")
-                    return Response(template_name='accounts/password_reset_confirm.html', status=status.HTTP_400_BAD_REQUEST)
-                return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
+                return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message="Invalid password reset link.",message_level='error')
         logger.warning(f"Reset password failed: %s", serializer.errors)
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {"errors": serializer.errors, "form_data": request.data, 'token': token},
-                template_name='accounts/password_reset_confirm.html',
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message='Error accour during password reset',errors=serializer.errors,message_level='error',html_context={"form_data": request.data, 'token': token})
 
-
+#! password change view
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class ChangePasswordView(APIView):
+class ChangePasswordView(BaseAPIView):
+    template_name='accounts/change_password.html'
     permission_classes = [IsAuthenticated,IsVerified]
-    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
+    authentication_classes = [CookieTokenAuthentication, SessionAuthentication] 
+    
 
     def get(self, request):
-        if request.accepted_renderer.format == 'html':
-            return Response(template_name='accounts/change_password.html')
-        return Response({"message": "Change password endpoint (GET)"}, status=200)
+        
+        return self.render_response(data={"message": "Change password endpoint (GET)"},status_code=status.HTTP_200_OK,template_name=self.template_name)
 
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
         response = None 
         if serializer.is_valid():
+       
             user = request.user
             user.set_password(serializer.validated_data['new_password'])
             user.save()
@@ -522,42 +351,28 @@ class ChangePasswordView(APIView):
 
             # Logout the user for session-based authentication
             logout(request)
+            logger.info(f"Password changed for {user.email}")
 
             # Create response and remove authentication cookies
-            response = Response({"message": "Password changed successfully"}, status=status.HTTP_200_OK)
+            response=self.render_response(data={},status_code=status.HTTP_200_OK,template_name='redirect:login',message="Password changed successfully. Please log in again.")
             response.delete_cookie('auth_token')
             response.delete_cookie('csrftoken')
-
             
-            logger.info(f"Password changed for {user.email}")
-            if request.accepted_renderer.format == 'html':
-                messages.success(request, "Password changed successfully. Please log in again.")
-                return redirect('login')
             return response
-        
-        
-
         logger.warning(f"Change password failed for {request.user.email}: %s", serializer.errors)
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {"errors": serializer.errors, "form_data": request.data},
-                template_name='accounts/change_password.html',
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message='Error accour during password change.',errors=serializer.errors,message_level='error',html_context={ "form_data": request.data})
+
     
-
-
+#! accouts delete view 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class DeleteAccountView(APIView):
+class DeleteAccountView(BaseAPIView):
+    template_name='accounts/delete_account.html'
     permission_classes = [IsAuthenticated,IsVerified ]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
+    
 
     def get(self, request):
-        if request.accepted_renderer.format == 'html':
-            return Response(template_name='accounts/delete_account.html')
-        return Response({"message": "Delete account endpoint (GET)"}, status=200)
+        return self.render_response(data={"message": "Delete account endpoint (GET)"},status_code=status.HTTP_200_OK,template_name=self.template_name)
 
     def post(self, request):
         serializer = DeleteAccountSerializer(data=request.data, context={'request': request})
@@ -571,16 +386,10 @@ class DeleteAccountView(APIView):
                     user.delete()
                     logger.info(f"Hard deletion completed for student {email}")
                     send_deletion_confirmation_email_task.delay(email, role)
-                    if request.accepted_renderer.format == 'html':
-                        messages.success(request, "Account deleted permanently.")
-                        return redirect('home')
-                    return Response({"message": "Student account deleted permanently"}, status=status.HTTP_200_OK)
+                    return self.render_response(data={},status_code=status.HTTP_200_OK,template_name='redirect:home',message="Account deleted permanently.")
                 except Exception as e:
                     logger.error(f"Hard deletion failed for {email}: %s", str(e))
-                    if request.accepted_renderer.format == 'html':
-                        messages.error(request, "Failed to delete account.")
-                        return Response(template_name='accounts/delete_account.html', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                    return Response({"error": "Failed to delete account"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return self.render_response(data={},status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,template_name=self.template_name,message= "Failed to delete account.",message_level='error')
             else:
                 user.is_active = False
                 user.save()
@@ -589,31 +398,23 @@ class DeleteAccountView(APIView):
                 if request.auth:
                     request.auth.delete()
                     logger.info(f"Auth token deleted for {email}")
-                if request.accepted_renderer.format == 'html':
-                    messages.success(request, f"{role} account deactivated successfully.")
-                    return redirect('home')
-                return Response({"message": f"{role} account deactivated successfully"}, status=status.HTTP_200_OK)
+                return self.render_response(data={},status_code=status.HTTP_200_OK,template_name='redirect:home',message=f"{role} account deactivated successfully.")
         logger.warning(f"Account deletion failed for {request.user.email}: %s", serializer.errors)
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {"errors": serializer.errors, "form_data": request.data},
-                template_name='accounts/delete_account.html',
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message='Error accour during account deletion.',errors=serializer.errors,message_level='error',html_context={"form_data": request.data})
 
 
 
+#! Email Update view
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class UpdateEmailView(APIView):
+class UpdateEmailView(BaseAPIView):
+    template_name='accounts/update_email.html'
     permission_classes = [IsAuthenticated,IsVerified]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
 
     def get(self, request):
-        if request.accepted_renderer.format == 'html':
-            return Response(template_name='accounts/update_email.html')
-        return Response({"message": "Update email endpoint (GET)"}, status=200)
+        return self.render_response(data={"message": "Update email endpoint (GET)"},status_code=status.HTTP_200_OK,template_name=self.template_name)
+
 
     def post(self, request):
         serializer = UpdateEmailSerializer(data=request.data, context={'request': request})
@@ -625,18 +426,11 @@ class UpdateEmailView(APIView):
 
             send_verification_email_task.delay(user.id, token.token, new_email=new_email)
             logger.info(f"Verification email sent to {new_email}")
-            if request.accepted_renderer.format == 'html':
-                messages.success(request, "Verification email sent to your new email.")
-                return redirect('profile')
-            return Response({"message": "Verification email sent to your new email"}, status=status.HTTP_200_OK)
+            return self.render_response(data={},status_code=status.HTTP_200_OK,template_name='redirect:profile',message="Verification email sent to your new email.")
+
         logger.warning(f"Email update failed for {request.user.email}: %s", serializer.errors)
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {"errors": serializer.errors, "form_data": request.data},
-                template_name='accounts/update_email.html',
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message='error occur during email update',errors=serializer.errors,message_level='error',html_context={"form_data": request.data})
+
 
 
 
@@ -644,6 +438,7 @@ class UpdateEmailView(APIView):
 #! profile view 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ProfileView(BaseAPIView):
+    template_name='accounts/profile.html'
     permission_classes = [IsAuthenticated]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
 
@@ -653,27 +448,29 @@ class ProfileView(BaseAPIView):
         if not profile_data:
             logger.warning("Profile view: no profile found for user %s", user.username)
             return self.render_response(
-                {"error": "Profile not found"},
-                status.HTTP_404_NOT_FOUND,
-                'redirect:home',
-                "Profile not found.",
-                'error'
+                data={},
+                status_code=status.HTTP_404_NOT_FOUND,
+                template_name='redirect:home',
+                message= "Profile not found.",
+                message_level='error'
             )
         user_serializer = UserUpdateSerializer(user)
         return self.render_response(
-            {
+           data= {
                 'user': user,
                 'profile': profile_data,
                 'user_data': user_serializer.data,
                 'profile_data': profile_data,
                 'is_update': False
             },
-            status.HTTP_200_OK,
-            'accounts/profile.html'
+            status_code=status.HTTP_200_OK,
+            template_name=self.template_name
         )
 
+#! profile Update view
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ProfileUpdateView(BaseAPIView):
+    template_name='accounts/profile.html'
     permission_classes = [IsAuthenticated, RoleBasedProfilePermission]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
 
@@ -683,23 +480,24 @@ class ProfileUpdateView(BaseAPIView):
         if not profile_data:
             logger.warning("Profile update view: no profile found for user %s", user.username)
             return self.render_response(
-                {"error": "Profile not found"},
-                status.HTTP_404_NOT_FOUND,
-                'redirect:home',
-                "Profile not found.",
-                'error'
+                data={},
+                status_code=status.HTTP_404_NOT_FOUND,
+                template_name='redirect:home',
+                message="Profile not found.",
+                message_level='error'
             )
         user_serializer = UserUpdateSerializer(user)
         return self.render_response(
-            {
+            data={
                 'user': user,
                 'profile': profile_data,
                 'user_data': user_serializer.data,
                 'profile_data': profile_data,
                 'is_update': True
             },
-            status.HTTP_200_OK,
-            'accounts/profile.html'
+            status_code=status.HTTP_200_OK,
+            template_name=self.template_name,
+            
         )
 
     def post(self, request):
@@ -714,11 +512,14 @@ class ProfileUpdateView(BaseAPIView):
         profile_data, errors = ProfileService.update_profile(user, request.data, request.FILES)
         if errors:
             return self.render_response(
-                {'errors': errors, 'form_data': request.data},
-                status.HTTP_400_BAD_REQUEST,
-                'accounts/profile.html',
-                "Profile update failed. Please check your input.",
-                'error'
+                data={},
+                status_code=status.HTTP_400_BAD_REQUEST,
+                template_name=self.template_name,
+                message="Profile update failed.",
+                errors=errors,
+                message_level='error',
+                html_context={'form_data': request.data}
+                
             )
         user_serializer = UserUpdateSerializer(user, data=user_data, partial=True)
         if user_serializer.is_valid():
@@ -727,217 +528,31 @@ class ProfileUpdateView(BaseAPIView):
         else:
             logger.warning("User data validation errors for user %s: %s", user.username, user_serializer.errors)
             return self.render_response(
-                {'errors': user_serializer.errors, 'form_data': request.data},
-                status.HTTP_400_BAD_REQUEST,
-                'accounts/profile.html',
-                "User data update failed.",
-                'error'
+                data={},
+                status_code=status.HTTP_400_BAD_REQUEST,
+                template_name=self.template_name,
+                message="User data update failed.",
+                errors=user_serializer.errors,
+                message_level='error',
+                html_context={'form_data': request.data}
             )
         
         return self.render_response(
-            {   'user':request.user,
+            data={'user':request.user,
                 'user_data': user_serializer.data,
                 'profile': profile_data
             },
-            status.HTTP_200_OK,
-            'accounts/profile.html',
-            "Profile updated successfully."
+            status_code=status.HTTP_200_OK,
+            template_name=self.template_name,
+            message="Profile updated successfully."
         )
-'''
+
+
+# self.render_response(data=,status_code=,template_name=,message=,message_level=,html_context=)
+#! Approval Request View 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-    renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
-
-    def get(self, request):
-        user = request.user
-        profile = user.get_profile()
-        if not profile:
-            logger.warning(f"No profile found for {user.email}")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, "Profile not found.")
-                return redirect('home')
-            return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = (
-            StudentProfileSerializer(profile) if user.role == User.Role.STUDENT
-            else TeacherProfileSerializer(profile)
-        )
-        user_serializer = UserUpdateSerializer(user)
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {
-                    'user': user,
-                    'profile': profile,
-                    'user_data': user_serializer.data,
-                    'profile_data': serializer.data,
-                    'is_update': False
-                },
-                template_name='accounts/profile.html'
-            )
-        logger.info(f"Retrieved profile for {user.email}")
-        return Response({
-            'user': user_serializer.data,
-            'profile': serializer.data
-        })
-
-@method_decorator(ensure_csrf_cookie, name='dispatch')
-class ProfileUpdateView(APIView):
-    permission_classes = [IsAuthenticated,RoleBasedProfilePermission]
-    authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
-    renderer_classes = [TemplateHTMLRenderer, JSONRenderer]
-
-    def get(self, request):
-        user = request.user
-        profile = user.get_profile()
-        if not profile:
-            logger.warning(f"No profile found for {user.email}")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, "Profile not found.")
-                return redirect('home')
-            return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = (
-            StudentProfileSerializer(profile) if user.role == User.Role.STUDENT
-            else TeacherProfileSerializer(profile)
-        )
-        user_serializer = UserUpdateSerializer(user)
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {
-                    'user': user,
-                    'profile': profile,
-                    'user_data': user_serializer.data,
-                    'profile_data': serializer.data,
-                    'is_update': True
-                },
-                template_name='accounts/profile.html'
-            )
-        logger.info(f"Retrieved profile for update for {user.email}")
-        return Response({
-            'user': user_serializer.data,
-            'profile': serializer.data
-        })
-    
-    def post(self, request):
-        user = request.user
-        profile = user.get_profile()
-        if not profile:
-            logger.warning(f"No profile found for {user.email}")
-            if request.accepted_renderer.format == 'html':
-                messages.error(request, "Profile not found.")
-                return redirect('home')
-            return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
-        # Data extraction for both HTML and API
-        if request.accepted_renderer.format == 'html':
-            raw = request.POST
-            user_data = {
-                'first_name': raw.get('first_name', '').strip() or None,
-                'last_name': raw.get('last_name', '').strip() or None,
-            }
-            profile_data = {
-                'phone_number': raw.get('phone_number', '').strip() or None,
-                'date_of_birth': raw.get('date_of_birth', '').strip() or None,
-                'gender': raw.get('gender', '').strip() or None,
-            }
-            if user.role == User.Role.STUDENT:
-                profile_data.update({
-                    'grade_level': raw.get('grade_level', '').strip() or None,
-                    'parent_email': raw.get('parent_email', '').strip() or None,
-                })
-            else:
-                profile_data.update({
-                    'department': raw.get('department', '').strip() or None,
-                    'office_number': raw.get('office_number', '').strip() or None,
-                    'qualifications': raw.get('qualifications', '').strip() or None,
-                })
-            if 'avatar' in request.FILES:
-                profile_data['avatar'] = request.FILES['avatar']
-        else:
-            data = request.data
-            user_data = data.get('user', {})
-            if not user_data:
-                user_data = {
-                    'first_name': data.get('first_name', '').strip() or None,
-                    'last_name': data.get('last_name', '').strip() or None,
-                }
-            profile_data = data.get('profile', {})
-            if not profile_data:
-                profile_data = {
-                    'phone_number': data.get('phone_number', '').strip() or None,
-                    'date_of_birth': data.get('date_of_birth', '').strip() or None,
-                    'gender': data.get('gender', '').strip() or None,
-                }
-                if user.role == User.Role.STUDENT:
-                    profile_data.update({
-                        'grade_level': data.get('grade_level', '').strip() or None,
-                        'parent_email': data.get('parent_email', '').strip() or None,
-                    })
-                else:
-                    profile_data.update({
-                        'department': data.get('department', '').strip() or None,
-                        'office_number': data.get('office_number', '').strip() or None,
-                        'qualifications': data.get('qualifications', '').strip() or None,
-                    })
-                if 'avatar' in request.FILES:
-                    profile_data['avatar'] = request.FILES['avatar']
-                elif 'avatar' in data:
-                    profile_data['avatar'] = data['avatar']
-        # Common validation/saving logic for both HTML and API
-        is_valid = True
-        if user_data:
-            user_serializer = UserUpdateSerializer(user, data=user_data, partial=True)
-            if user_serializer.is_valid():
-                user_serializer.save()
-            else:
-                is_valid = False
-                logger.error(f"User update errors: {user_serializer.errors}")
-        profile_serializer = (
-            StudentProfileSerializer(profile, data=profile_data, partial=True)
-            if user.role == User.Role.STUDENT 
-            else TeacherProfileSerializer(profile, data=profile_data, partial=True)
-        )
-        if profile_serializer.is_valid():
-            profile_serializer.save()
-        else:
-            is_valid = False
-            logger.error(f"Profile update errors: {profile_serializer.errors}")
-        if is_valid:
-            logger.info(f"Updated profile for {user.email}")
-            if request.accepted_renderer.format == 'html':
-                messages.success(request, "Profile updated successfully.")
-                return redirect('profile')
-            return Response({
-                'user': user_serializer.data if user_data else UserUpdateSerializer(user).data,
-                'profile': profile_serializer.data
-            })
-        # Error handling for both formats
-        logger.error(f"Combined errors: {user_serializer.errors if user_data else {}} | {profile_serializer.errors}")
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {
-                    'user': user,
-                    'profile': profile,
-                    'user_data': user_data,
-                    'profile_data': profile_data,
-                    'errors': {**(user_serializer.errors if user_data else {}), **profile_serializer.errors},
-                    'is_update': True
-                },
-                template_name='accounts/profile.html',
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        return Response(
-            {**(user_serializer.errors if user_data else {}), **profile_serializer.errors},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-
-'''
-    
-
-
-@method_decorator(ensure_csrf_cookie, name='dispatch')
-class ApprovalRequestView(APIView):
-    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
+class ApprovalRequestView(BaseAPIView):
+    template_name='accounts/approval_request.html'
     permission_classes = [IsAuthenticated, IsTeacher]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
 
@@ -953,21 +568,12 @@ class ApprovalRequestView(APIView):
         serializer = ApprovalRequestSerializer(pending_request) if pending_request else None
         rejection_reason = rejected_request.rejection_reason if rejected_request else None
 
-        if request.accepted_renderer.format == 'html':
-            return Response(
-                {
+       
+        Response_data= {
                     'approval_request': serializer.data if serializer else None,
                     'rejection_reason': rejection_reason,
-                },
-                template_name='accounts/approval_request.html'
-            )
-        return Response(
-            {
-                'approval_request': serializer.data if serializer else None,
-                'rejection_reason': rejection_reason,
-            },
-            status=status.HTTP_200_OK
-        )
+                }
+        return self.render_response(data=Response_data,status_code=status.HTTP_200_OK,template_name=self.template_name)
 
     def post(self, request):
         pending_request = ApprovalRequest.objects.filter(
@@ -982,21 +588,9 @@ class ApprovalRequestView(APIView):
             approval_request = serializer.save(user=request.user)
             logger.info("Approval request submitted for user: %s (ID: %s)", request.user.username, approval_request.id)
             send_approval_request_notification.delay(approval_request.id)
-
-            if request.accepted_renderer.format == 'html':
-                messages.success(request, "Your credentials have been submitted for approval.")
-                return redirect('profile')
-            return Response(
-                {"message": "Credentials submitted successfully."},
-                status=status.HTTP_201_CREATED
-            )
+            return self.render_response(data={},status_code=status.HTTP_201_CREATED,template_name='redirect:profile',message="Your credentials have been submitted for approval.")
+        
         else:
             logger.warning("Approval request validation errors: %s", serializer.errors)
-            if request.accepted_renderer.format == 'html':
-                return Response(
-                    {"errors": serializer.errors, "form_data": request.data},
-                    template_name='accounts/approval_request.html',
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            return self.render_response(data={},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message='Error during credentials submission',errors=serializer.errors,message_level='error',html_context={"form_data": request.data})
 
