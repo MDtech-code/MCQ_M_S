@@ -238,3 +238,8 @@ CELERY_TIMEZONE = 'Asia/Karachi' #Your Time Zone
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+
+# Authentication strategy configuration
+AUTH_STRATEGY = 'cookie_token'  # Default to cookie-based token authentication
+SITE_NAME=config('SITE_NAME','localhost')

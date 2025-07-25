@@ -1,0 +1,16 @@
+
+Dear {{ user.username }},
+
+{% if approved %}
+Congratulations! Your teacher account has been approved.
+Start creating tests at: {{ dashboard_url }}
+{% else %}
+We regret to inform you that your teacher account application was not approved.
+{% if rejection_reason %}
+Reason: {{ rejection_reason }}
+{% endif %}
+Contact support for further details.
+{% endif %}
+
+Thanks,
+{{ site_name }} Team

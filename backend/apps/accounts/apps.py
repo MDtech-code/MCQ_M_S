@@ -6,5 +6,6 @@ class AccountsConfig(AppConfig):
     name = 'apps.accounts'
 
     def ready(self):
+        
         # Import signals to register them
         import apps.accounts.signals

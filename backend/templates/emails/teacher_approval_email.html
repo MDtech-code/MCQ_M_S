@@ -1,0 +1,13 @@
+
+<p>Dear {{ user.username }},</p>
+{% if approved %}
+<p>Congratulations! Your teacher account has been approved.</p>
+<p>Start creating tests at: <a href="{{ dashboard_url }}">Teacher Dashboard</a></p>
+{% else %}
+<p>We regret to inform you that your teacher account application was not approved.</p>
+{% if rejection_reason %}
+<p>Reason: {{ rejection_reason }}</p>
+{% endif %}
+<p>Contact support for further details.</p>
+{% endif %}
+<p>Thanks,<br>{{ site_name }} Team</p>

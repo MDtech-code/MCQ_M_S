@@ -9,14 +9,29 @@ from rest_framework.views import APIView
 from rest_framework.renderers import JSONRenderer, TemplateHTMLRenderer
 from rest_framework.response import Response
 from rest_framework import status
+import logging
+logger = logging.getLogger(__name__)
 
 
 class BaseAPIView(APIView):
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
     MESSAGE_KEY = 'message'  # Central key for API messages
     ERRORS_KEY = 'errors'    # Central key for error details
+    template_map = {}        # Map of view methods to template paths or redirects
 
-
+    def get_template_name(self, method: str) -> Optional[str]:
+        """Resolve template name for the given HTTP method from template_map."""
+        view_name = self.__class__.__name__
+        # Check for method-specific template (e.g., 'POST': 'template.html')
+        template = self.template_map.get(method.upper())
+        # Fallback to view-level template (e.g., 'DEFAULT': 'template.html')
+        template = template or self.template_map.get('DEFAULT')
+        # Fallback to template_name if defined
+        template = template or getattr(self, 'template_name', None)
+        if not template:
+            logger.warning(f"No template defined for {view_name}.{method}")
+        return template
+    
     def render_response(
         self,
         *,
@@ -54,6 +69,10 @@ class BaseAPIView(APIView):
         # Add error details to payload for API clients
         if errors:
             payload[self.ERRORS_KEY] = errors
+
+        # Resolve template dynamically if not provided
+        if not template_name:
+            template_name = self.get_template_name(self.request.method)
 
         # HTML-render path
         if self.request.accepted_renderer.format == 'html':

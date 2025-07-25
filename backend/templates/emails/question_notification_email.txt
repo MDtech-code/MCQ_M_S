@@ -1,0 +1,7 @@
+
+Hello,
+
+Your question "{{ question.question_text|truncatechars:50 }}" has been {{ action }}.
+
+Thanks,
+{{ site_name }} Team

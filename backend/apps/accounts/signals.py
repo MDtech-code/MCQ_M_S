@@ -1,23 +1,98 @@
-# accounts/signals.py
+from django.dispatch import Signal, receiver
+from django.contrib.auth.models import Group
+from apps.accounts.models import ApprovalRequest, EmailVerificationToken
+from apps.accounts.config.roles import RoleRegistry
+from apps.common.choices.role import Role
+from apps.accounts.tasks import send_welcome_email_task,send_verification_email_task,send_approval_request_notification
+from apps.accounts.models import User
 from django.db.models.signals import post_save
-from django.dispatch import Signal,receiver
-from .models import User
 from apps.accounts.service.role_service import RoleService
+from apps.accounts.service.profile_service import ProfileService
 import logging
 
+
+
 logger = logging.getLogger(__name__)
-user_signed_up = Signal()
+
+
+# Define custom signals
+user_role_assigned = Signal()  # Sent when a user's role is assigned
+profile_created = Signal()      # Sent when a profile is created for a user
+approval_request_needed = Signal()  # Sent when an approval request is needed
+
 
 @receiver(post_save, sender=User)
-def handle_user_creation(sender, instance, created, **kwargs):
-    logger.info("Received post_save signal for user: %s (ID: %s)", instance.username, instance.id)
+def handle_user_post_save(sender, instance: User, created: bool, **kwargs) -> None:
+    """Handle post-save actions for User model."""
     RoleService.handle_user_creation(instance, created)
+    if not created:
+        ProfileService.invalidate_profile_cache(instance)
+        
 
-@receiver(user_signed_up)
-def user_signed_up_receiver(sender, user, **kwargs):
-    logger.info("Received user_signed_up signal for user: %s (ID: %s)", user.username, user.id)
-    from .tasks import send_welcome_email_task
-    send_welcome_email_task.delay(user.id)
+@receiver(user_role_assigned, sender=User)
+def handle_group_assignment(sender, user: User, **kwargs) -> None:
+    """Assign groups to a user based on their role."""
+    group_names = RoleRegistry.get_groups(user.role)
+    for group_name in group_names:
+        group, _ = Group.objects.get_or_create(name=group_name)
+        user.groups.add(group)
+        logger.info("Assigned group %s to user %s", group_name, user.username)
+
+@receiver(profile_created, sender=User)
+def handle_profile_creation(sender, user: User, **kwargs) -> None:
+    """Create a profile for the user based on their role."""
+    profile_class = RoleRegistry.get_profile_model(user.role)
+    if profile_class:
+        profile, created = profile_class.objects.get_or_create(user=user)
+        logger.info("Created %s profile for user %s (created: %s)", user.role, user.username, created)
+    else:
+        logger.warning("No profile class found for role %s for user %s", user.role, user.username)
+
+@receiver(approval_request_needed, sender=User)
+def handle_approval_request(sender, user: User, **kwargs) -> None:
+    """Create an approval request for users requiring approval (e.g., TEACHER)."""
+    if user.role == Role.TEACHER:
+        approval_request, created = ApprovalRequest.objects.get_or_create(
+            user=user,
+            defaults={'status': ApprovalRequest.Status.PENDING}
+        )
+        if created:
+            logger.info("Created approval request for teacher %s", user.username)
+            send_approval_request_notification.delay(approval_request.id)
+
+@receiver(user_role_assigned, sender=User)
+def handle_verification_email(sender, user: User, **kwargs) -> None:
+    """Send a verification email to the user."""
+    if user.role != Role.ADMIN:  # Skip for admins
+        token = EmailVerificationToken.objects.create(user=user)
+        send_verification_email_task.delay(user.id, token.token)
+        logger.info("Triggered verification email task for user %s", user.username)
+@receiver(user_role_assigned, sender=User)
+def handle_welcome_email(sender, user: User, **kwargs) -> None:
+    """Send a welcome email to the user."""
+    if user.role != Role.ADMIN:  # Skip for admins
+        send_welcome_email_task.delay(user.id)
+        logger.info("Triggered welcome email task for user %s", user.username)
+# # accounts/signals.py
+# from django.db.models.signals import post_save
+# from django.dispatch import Signal,receiver
+# from .models import User
+# from apps.accounts.service.role_service import RoleService
+# import logging
+
+# logger = logging.getLogger(__name__)
+# user_signed_up = Signal()
+
+# @receiver(post_save, sender=User)
+# def handle_user_creation(sender, instance, created, **kwargs):
+#     logger.info("Received post_save signal for user: %s (ID: %s)", instance.username, instance.id)
+#     RoleService.handle_user_creation(instance, created)
+
+# @receiver(user_signed_up)
+# def user_signed_up_receiver(sender, user, **kwargs):
+#     logger.info("Received user_signed_up signal for user: %s (ID: %s)", user.username, user.id)
+#     from .tasks import send_welcome_email_task
+#     send_welcome_email_task.delay(user.id)
 
 
 

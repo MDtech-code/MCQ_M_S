@@ -10,6 +10,8 @@ from apps.accounts.utils.validations import (
 )
 from django.utils.translation import gettext_lazy as _
 
+from apps.accounts.service.user_service import UserService
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -37,8 +39,8 @@ class UserSerializer(serializers.ModelSerializer):
         """
         Validate email using centerlized validator 
         """
-        value=validate_email(value,field_name='email')
-        return value
+        
+        return validate_email(value,field_name='email')
     
     def validate_username(self, value):
         """
@@ -66,16 +68,16 @@ class UserSerializer(serializers.ModelSerializer):
         """
         Create a new user with the validated data.
         """
-        validated_data.pop('password2')
-        user = User(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            role=validated_data.get('role', User.Role.STUDENT)
-        )
-        user.set_password(validated_data['password'])
-        user.save()
-        logger.info("Created new user: username=%s, id=%s", user.username, user.id)
-        return user
+        # validated_data.pop('password2')
+        # user = User(
+        #     username=validated_data['username'],
+        #     email=validated_data['email'],
+        #     role=validated_data.get('role', Role.STUDENT)
+        # )
+        # user.set_password(validated_data['password'])
+        # user.save()
+        # logger.info("Created new user: username=%s, id=%s", user.username, user.id)
+        return UserService.create_user(validated_data)
 
 class UserLoginSerializer(serializers.Serializer):
     """
@@ -262,13 +264,13 @@ class ApprovalRequestSerializer(serializers.ModelSerializer):
         model = ApprovalRequest
         fields = ('qualifications', 'document', 'message')
 
-    def validate(self, data):
-        document = data.get('document')
-        if document:
-            if document.size > 5 * 1024 * 1024:  # 5MB
-                raise serializers.ValidationError({"document": "File size must be under 5MB."})
-            if not document.name.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png')):
-                raise serializers.ValidationError({"document": "Only PDF, JPEG, or PNG files are allowed."})
-        if not data.get('qualifications').strip():
-            raise serializers.ValidationError({"qualifications": "Qualifications cannot be empty."})
-        return data
+    # def validate(self, data):
+    #     document = data.get('document')
+    #     if document:
+    #         if document.size > 5 * 1024 * 1024:  # 5MB
+    #             raise serializers.ValidationError({"document": "File size must be under 5MB."})
+    #         if not document.name.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png')):
+    #             raise serializers.ValidationError({"document": "Only PDF, JPEG, or PNG files are allowed."})
+    #     if not data.get('qualifications').strip():
+    #         raise serializers.ValidationError({"qualifications": "Qualifications cannot be empty."})
+    #     return data

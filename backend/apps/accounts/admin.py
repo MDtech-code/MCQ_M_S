@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 from .models import User, StudentProfile, TeacherProfile, ApprovalRequest,EmailVerificationToken, PasswordResetToken
 from .tasks import send_teacher_approval_email_task
+from apps.common.choices.role import Role
 
 class StudentProfileInline(admin.StackedInline):
     model = StudentProfile
@@ -44,13 +45,13 @@ class UserAdmin(BaseUserAdmin):
     actions = ['approve_teachers', 'reject_teachers']
 
     def get_inline_instances(self, request, obj=None):
-        if obj and obj.role == User.Role.ADMIN:
+        if obj and obj.role == Role.ADMIN:
             return []
         inline_instances = []
         if obj:
-            if obj.role == User.Role.STUDENT:
+            if obj.role == Role.STUDENT:
                 inline_instances.append(StudentProfileInline(self.model, self.admin_site))
-            elif obj.role == User.Role.TEACHER:
+            elif obj.role == Role.TEACHER:
                 inline_instances.append(TeacherProfileInline(self.model, self.admin_site))
         return inline_instances
 

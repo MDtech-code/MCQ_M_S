@@ -1,0 +1,10 @@
+
+Hello {{ user.username }},
+
+Please verify your email ({{ user.email }}) by visiting:
+{{ verify_url }}
+
+The link expires in 24 hours.
+
+Thanks,
+{{ site_name }} Team

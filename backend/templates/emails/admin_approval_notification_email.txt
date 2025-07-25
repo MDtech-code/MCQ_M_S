@@ -1,0 +1,8 @@
+
+Hello Admin,
+
+Question "{{ question.question_text|truncatechars:50 }}" (ID: {{ question.id }}) was flagged: {{ flag_reason }}.
+Please review in the admin panel.
+
+Thanks,
+{{ site_name }} Team

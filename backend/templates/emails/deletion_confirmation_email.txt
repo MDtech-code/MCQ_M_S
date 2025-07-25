@@ -1,0 +1,7 @@
+
+Dear {{ user.username|default:"User" }},
+
+{{ message }}
+
+Thanks,
+{{ site_name }} Team

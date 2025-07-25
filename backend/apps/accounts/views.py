@@ -9,7 +9,7 @@ from .serializers import UserSerializer, UserLoginSerializer,StudentProfileSeria
 from rest_framework.permissions import AllowAny,IsAuthenticated
 from apps.common.authentication import CookieTokenAuthentication
 from rest_framework.authtoken.models import Token
-from apps.accounts.signals import user_signed_up
+# from apps.accounts.signals import user_signed_up
 from .models import EmailVerificationToken,PasswordResetToken,User,StudentProfile,ApprovalRequest
 from .tasks import send_verification_email_task,send_password_reset_email_task,send_deletion_confirmation_email_task,send_approval_request_notification
 from django.contrib.auth import password_validation
@@ -20,7 +20,9 @@ from django.contrib import messages
 from apps.common.permissions import IsTeacher,IsStudent,IsApprovedTeacher,IsAdmin,IsVerified,IsNotAuthenticated,RoleBasedProfilePermission
 from apps.accounts.service.auth_service import AuthService
 from apps.accounts.service.profile_service import ProfileService
+from apps.accounts.service.auth_strategies.auth_strategy_factory import AuthStrategyFactory
 from apps.common.api.base import BaseAPIView
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -42,19 +44,23 @@ logger = logging.getLogger(__name__)
 #! Signup 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class SignupView(BaseAPIView):
-    template_name='accounts/auth/signup.html'
+    # template_name='accounts/auth/signup.html'
+    template_map = {
+        'GET': 'accounts/auth/signup.html',
+        'POST': 'redirect:home',
+    }
     permission_classes = [IsNotAuthenticated]
     authentication_classes = [SessionAuthentication]
 
 
     def get(self, request):
-        return self.render_response(data={"message": "Signup endpoint (GET)"}, status_code=status.HTTP_200_OK, template_name=self.template_name)
+        return self.render_response(data={"message": "Signup endpoint (GET)"}, status_code=status.HTTP_200_OK)
 
     def post(self, request):
-        auth_service = AuthService()
+        auth_service = AuthService(strategy=AuthStrategyFactory.get_strategy())
         user, token, errors = auth_service.signup(request)
         if errors:
-            return self.render_response(data={"errors": errors},status_code=status.HTTP_400_BAD_REQUEST,template_name=self.template_name,message="Signup failed. Please check your input.",message_level= 'error',html_context={"form_data": request.data})
+            return self.render_response(data={"errors": errors},status_code=status.HTTP_400_BAD_REQUEST,message="Signup failed. Please check your input.",message_level= 'error',html_context={"form_data": request.data})
         response_data = {
             "user": {
                 "id": user.id,
@@ -63,7 +69,7 @@ class SignupView(BaseAPIView):
                 "role": user.role
             },
         }
-        response = self.render_response(data=response_data, status_code=status.HTTP_201_CREATED, template_name='redirect:home', message="User created successfully.")
+        response = self.render_response(data=response_data, status_code=status.HTTP_201_CREATED,  message="User created successfully.")
         response.set_cookie(
             key='auth_token',
             value=token,
@@ -86,7 +92,7 @@ class LoginView(BaseAPIView):
         return self.render_response(data={"message": "Login endpoint (GET)"}, status_code=status.HTTP_200_OK, template_name=self.template_name)
 
     def post(self, request):
-        auth_service = AuthService()
+        auth_service = AuthService(strategy=AuthStrategyFactory.get_strategy())
         user, token, errors = auth_service.login(request)
         if errors:
             return self.render_response(
@@ -470,11 +476,12 @@ class ProfileView(BaseAPIView):
 #! profile Update view
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class ProfileUpdateView(BaseAPIView):
-    template_name='accounts/profile.html'
+    template_name = 'accounts/profile.html'
     permission_classes = [IsAuthenticated, RoleBasedProfilePermission]
     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
 
     def get(self, request):
+        """Handle GET requests to retrieve user profile."""
         user = request.user
         profile_data = ProfileService.get_profile(user)
         if not profile_data:
@@ -497,10 +504,10 @@ class ProfileUpdateView(BaseAPIView):
             },
             status_code=status.HTTP_200_OK,
             template_name=self.template_name,
-            
         )
 
     def post(self, request):
+        """Handle POST requests to update user profile."""
         user = request.user
         user_data = (
             {
@@ -509,8 +516,9 @@ class ProfileUpdateView(BaseAPIView):
             } if request.accepted_renderer.format == 'html'
             else request.data.get('user', request.data)
         )
-        profile_data, errors = ProfileService.update_profile(user, request.data, request.FILES)
+        profile_data, errors = ProfileService.update_profile(user, request.data)
         if errors:
+            logger.warning("Profile update errors for user %s: %s", user.username, errors)
             return self.render_response(
                 data={},
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -519,7 +527,6 @@ class ProfileUpdateView(BaseAPIView):
                 errors=errors,
                 message_level='error',
                 html_context={'form_data': request.data}
-                
             )
         user_serializer = UserUpdateSerializer(user, data=user_data, partial=True)
         if user_serializer.is_valid():
@@ -536,9 +543,9 @@ class ProfileUpdateView(BaseAPIView):
                 message_level='error',
                 html_context={'form_data': request.data}
             )
-        
         return self.render_response(
-            data={'user':request.user,
+            data={
+                'user': request.user,
                 'user_data': user_serializer.data,
                 'profile': profile_data
             },
@@ -546,6 +553,84 @@ class ProfileUpdateView(BaseAPIView):
             template_name=self.template_name,
             message="Profile updated successfully."
         )
+# @method_decorator(ensure_csrf_cookie, name='dispatch')
+# class ProfileUpdateView(BaseAPIView):
+#     template_name='accounts/profile.html'
+#     permission_classes = [IsAuthenticated, RoleBasedProfilePermission]
+#     authentication_classes = [CookieTokenAuthentication, SessionAuthentication]
+
+#     def get(self, request):
+#         user = request.user
+#         profile_data = ProfileService.get_profile(user)
+#         if not profile_data:
+#             logger.warning("Profile update view: no profile found for user %s", user.username)
+#             return self.render_response(
+#                 data={},
+#                 status_code=status.HTTP_404_NOT_FOUND,
+#                 template_name='redirect:home',
+#                 message="Profile not found.",
+#                 message_level='error'
+#             )
+#         user_serializer = UserUpdateSerializer(user)
+#         return self.render_response(
+#             data={
+#                 'user': user,
+#                 'profile': profile_data,
+#                 'user_data': user_serializer.data,
+#                 'profile_data': profile_data,
+#                 'is_update': True
+#             },
+#             status_code=status.HTTP_200_OK,
+#             template_name=self.template_name,
+            
+#         )
+
+#     def post(self, request):
+#         user = request.user
+#         user_data = (
+#             {
+#                 'first_name': request.POST.get('first_name', '').strip() or None,
+#                 'last_name': request.POST.get('last_name', '').strip() or None,
+#             } if request.accepted_renderer.format == 'html'
+#             else request.data.get('user', request.data)
+#         )
+#         profile_data, errors = ProfileService.update_profile(user, request.data, request.FILES)
+#         if errors:
+#             return self.render_response(
+#                 data={},
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 template_name=self.template_name,
+#                 message="Profile update failed.",
+#                 errors=errors,
+#                 message_level='error',
+#                 html_context={'form_data': request.data}
+                
+#             )
+#         user_serializer = UserUpdateSerializer(user, data=user_data, partial=True)
+#         if user_serializer.is_valid():
+#             user_serializer.save()
+#             logger.info("User data updated successfully for user %s", user.username)
+#         else:
+#             logger.warning("User data validation errors for user %s: %s", user.username, user_serializer.errors)
+#             return self.render_response(
+#                 data={},
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 template_name=self.template_name,
+#                 message="User data update failed.",
+#                 errors=user_serializer.errors,
+#                 message_level='error',
+#                 html_context={'form_data': request.data}
+#             )
+        
+#         return self.render_response(
+#             data={'user':request.user,
+#                 'user_data': user_serializer.data,
+#                 'profile': profile_data
+#             },
+#             status_code=status.HTTP_200_OK,
+#             template_name=self.template_name,
+#             message="Profile updated successfully."
+#         )
 
 
 # self.render_response(data=,status_code=,template_name=,message=,message_level=,html_context=)

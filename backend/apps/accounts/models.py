@@ -8,8 +8,23 @@ from apps.common.models import TimeStampedModel
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta
+from apps.common.choices.role import Role
+
+
+from apps.common.choices.gender import Gender
+import logging
+from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 import uuid
 
+
+
+#! RoleRegsitry import 
+# at top of models.py
+def get_role_registry():
+    from apps.accounts.config.roles import RoleRegistry
+    return RoleRegistry
 
 
 
@@ -18,10 +33,7 @@ class User(AbstractUser):
     Custom user model implementing username or email-based authentication with role-based access control.
     """
     
-    class Role(models.TextChoices):
-        STUDENT = 'ST', _('Student')
-        TEACHER = 'TE', _('Teacher')
-        ADMIN = 'AD', _('Admin')
+  
     
     username = models.CharField(
         _('username'),
@@ -103,65 +115,96 @@ class User(AbstractUser):
         ordering = ['-date_joined']
 
     
-    def clean(self):
-        """Validate role consistency"""
-        super().clean()
+    # def clean(self):
+    #     """Validate role consistency"""
+    #     super().clean()
         
         
-        if self.role == User.Role.ADMIN and not self.is_staff:
-            raise ValidationError({
-                'role': _('ADMIN role requires staff status.')
-            })
+    #     if self.role == Role.ADMIN and not self.is_staff:
+    #         raise ValidationError({
+    #             'role': _('ADMIN role requires staff status.')
+    #         })
             
-        # Prevent non-staff from being assigned ADMIN role
-        if not self.is_staff and self.role == User.Role.ADMIN:
-            raise ValidationError({
-                'role': _('Only staff members can have ADMIN role.')
-            })
-        # Teachers require approval
-        if self.role == User.Role.TEACHER and self.is_approved is None:
-            self.is_approved = False
+    #     # Prevent non-staff from being assigned ADMIN role
+    #     if not self.is_staff and self.role == Role.ADMIN:
+    #         raise ValidationError({
+    #             'role': _('Only staff members can have ADMIN role.')
+    #         })
+    #     # Teachers require approval
+    #     if self.role == Role.TEACHER and self.is_approved is None:
+    #         self.is_approved = False
     
-    def save(self, *args, **kwargs):
+    # def save(self, *args, **kwargs):
+    #     """
+    #     Automatically enforce role consistency during save.
+    #     """
+    #     if self.is_staff and  self.is_superuser:
+    #         self.role = Role.ADMIN
+    #         self.is_approved = True
+    #     elif self.role == Role.TEACHER and self.is_approved is None:
+    #         self.is_approved = False
+    #     super().save(*args, **kwargs)
+    
+
+    # def _assign_role_group(self) -> None:
+    #     """
+    #     Assign user to default group based on role.
+    #     Creates group if it doesn't exist.
+    #     """
+    #     group_name = f"{self.get_role_display()}_Group"
+    #     group, _ = Group.objects.get_or_create(name=group_name)
+    #     self.groups.add(group)
+
+   
+    # def get_profile(self):
+    #     from apps.accounts.service.profile_service import ProfileService
+    #     profile = ProfileService.get_profile(self)
+    #     return profile
+    def clean(self) -> None:
+        """Validate user fields using role-specific validators from RoleRegistry.
+
+        Raises:
+            ValidationError: If any role-specific validation fails.
         """
-        Automatically enforce role consistency during save.
+        super().clean()
+        registry=get_role_registry()
+        validators = registry.get_validators(self.role)
+        for validator in validators:
+            try:
+                validator(self)
+            except ValidationError as e:
+                logger.warning("Validation failed for user %s: %s", self.username, str(e))
+                raise e
+
+    def save(self, *args, **kwargs) -> None:
+        """Save the user instance, applying role-specific logic.
+
+        Ensures role consistency and assigns role-based groups.
         """
-        if self.is_staff and  self.is_superuser:
-            self.role = User.Role.ADMIN
+        if self.is_superuser or self.is_staff:
+            self.role = Role.ADMIN
             self.is_approved = True
-        elif self.role == User.Role.TEACHER and self.is_approved is None:
-            self.is_approved = False
         super().save(*args, **kwargs)
-    
+        self._assign_role_group()
+        logger.info("Saved user: username=%s, id=%s, role=%s", self.username, self.id, self.role)
 
     def _assign_role_group(self) -> None:
-        """
-        Assign user to default group based on role.
-        Creates group if it doesn't exist.
-        """
-        group_name = f"{self.get_role_display()}_Group"
-        group, _ = Group.objects.get_or_create(name=group_name)
-        self.groups.add(group)
+        """Assign the user to role-based groups using RoleRegistry."""
+        registry=get_role_registry()
+        group_names = registry.get_groups(self.role)
+        for group_name in group_names:
+            group, _ = Group.objects.get_or_create(name=group_name)
+            self.groups.add(group)
+            logger.info("Assigned group %s to user %s", group_name, self.username)
 
-    # def get_profile(self):
-    #     """
-    #     Explicitly fetch the related profile based on the user's role.
-    #     """
-    #     if self.role == self.Role.STUDENT:
-    #         try:
-    #             return self.studentprofile
-    #         except StudentProfile.DoesNotExist:
-    #             return None
-    #     elif self.role == self.Role.TEACHER:
-    #         try:
-    #             return self.teacherprofile
-    #         except TeacherProfile.DoesNotExist:
-    #             return None
-    #     return None
-    def get_profile(self):
+    def get_profile(self) -> Optional[Dict[str, Any]]:
+        """Retrieve the user's profile data.
+
+        Returns:
+            Serialized profile data or None if no profile exists.
+        """
         from apps.accounts.service.profile_service import ProfileService
-        profile = ProfileService.get_profile(self)
-        return profile
+        return ProfileService.get_profile(self)
     
 
     def __str__(self) -> str:
@@ -223,15 +266,15 @@ class PasswordResetToken(TimeStampedModel):
 
     def __str__(self):
         return f"Reset token for {self.user.email}"
+    
+
+
 class BaseProfile(TimeStampedModel):
     """
     Abstract base profile containing common personal information.
     """
     
-    class Gender(models.TextChoices):
-        MALE = 'MA', _('Male')
-        FEMALE = 'FE', _('Female')
-        UNDISCLOSED = 'UD', _('Prefer not to say')
+    
        
 
    

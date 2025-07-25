@@ -1,0 +1,8 @@
+
+Hello Admin,
+
+A new teacher approval request has been submitted by {{ user.username }}.
+Please review at: {{ admin_login_url }}
+
+Thanks,
+{{ site_name }} Team

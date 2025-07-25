@@ -1,0 +1,9 @@
+
+Hello {{ user.username }},
+
+{{ message }}
+
+Visit: {{ settings.FRONTEND_URL }}
+
+Thanks,
+{{ site_name }} Team

@@ -11,7 +11,7 @@ from django.contrib.auth import login
 from rest_framework.authtoken.models import Token
 from apps.accounts.models import User, ApprovalRequest
 from apps.accounts.serializers import UserSerializer, ApprovalRequestSerializer
-from apps.accounts.signals import user_signed_up
+# from apps.accounts.signals import user_signed_up
 from apps.accounts.tasks import send_approval_request_notification
 from apps.notifications.models import Notification
 import logging

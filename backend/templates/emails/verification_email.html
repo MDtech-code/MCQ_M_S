@@ -1,0 +1,6 @@
+
+<p>Hello {{ user.username }},</p>
+<p>Please verify your email ({{ user.email }}) by clicking the link below:</p>
+<a href="{{ verify_url }}">Verify Email</a>
+<p>The link expires in 24 hours.</p>
+<p>Thanks,<br>{{ site_name }} Team</p>
